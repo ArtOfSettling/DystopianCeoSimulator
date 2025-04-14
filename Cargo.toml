@@ -1,0 +1,12 @@
+[workspace]
+resolver = "3"
+members = [
+    "shared",
+    "client",
+    "server",
+    "launcher",
+    "renderer/renderer-api",
+    "renderer/renderer-ratatui",
+    "input/input-api",
+    "input/input-crossterm"
+]

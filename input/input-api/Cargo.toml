@@ -1,0 +1,12 @@
+[package]
+name = "input-api"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+shared = { path = "../../shared" }
+
+[dependencies.bevy]
+version = "0.15.3"
+default-features = false
+features = []

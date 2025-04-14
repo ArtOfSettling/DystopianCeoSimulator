@@ -1,0 +1,15 @@
+[package]
+name = "input-crossterm"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+crossterm = "0.29.0"
+input-api = { path = "../input-api" }
+shared = { path = "../../shared" }
+tracing = "0.1.41"
+
+[dependencies.bevy]
+version = "0.15.3"
+default-features = false
+features = []

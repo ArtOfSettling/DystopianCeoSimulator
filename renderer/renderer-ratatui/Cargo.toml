@@ -1,0 +1,17 @@
+[package]
+name = "renderer-ratatui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+renderer-api = { path = "../renderer-api" }
+shared = { path = "../../shared" }
+ratatui = "0.29.0"
+tracing = "0.1.41"
+
+[dependencies.bevy]
+version = "0.15.3"
+default-features = false
+features = [
+
+]
