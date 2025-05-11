@@ -1,5 +1,5 @@
 use bevy::prelude::{Query, Resource};
-use shared::{Player, Position};
+use shared::{InternalEntity, Player, Position};
 
 #[derive(Resource)]
 pub struct RendererResource {
@@ -13,5 +13,5 @@ impl RendererResource {
 }
 
 pub trait Renderer {
-    fn render(&mut self, player_query: Query<(&Player, &Position)>);
+    fn render(&mut self, player_query: Query<(&Player, &InternalEntity, &Position)>);
 }

@@ -1,14 +1,14 @@
 use crate::systems::ServerEventSender;
 use bevy::prelude::{Changed, Query, Res};
 use shared::ServerEvent::UpdatedWorldState;
-use shared::{Player, Position, WorldState};
+use shared::{InternalEntity, Player, Position, WorldState};
 use tracing::{debug, error};
 
 pub fn sync_world_state(
     channel: Res<ServerEventSender>,
     player_query: Query<
         // component
-        (&Player, &Position),
+        (&Player, &InternalEntity, &Position),
         // filter
         Changed<Position>,
     >,
@@ -17,11 +17,11 @@ pub fn sync_world_state(
         return;
     }
 
-    let (player, position) = player_query.single();
+    let (_player, internal_entity, position) = player_query.single();
     match channel
         .tx_server_events
         .try_send(UpdatedWorldState(WorldState {
-            player_1: player.clone(),
+            player_1_internal_entity: internal_entity.clone(),
             player_1_position: position.clone(),
         })) {
         Ok(_) => {

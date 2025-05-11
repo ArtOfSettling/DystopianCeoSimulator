@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+use shared::InternalEntity;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum InternalCommand {
-    PlayerConnected(Uuid),
-    PlayerDisconnected(Uuid),
+    PlayerConnected(InternalEntity),
+    PlayerDisconnected(InternalEntity),
 }

@@ -11,6 +11,7 @@ pub enum ClientCommand {
 pub enum ServerEvent {
     None,
 
+    InitialWorldState(WorldState),
     UpdatedWorldState(WorldState),
 }
 
@@ -42,8 +43,15 @@ pub struct Position {
 }
 
 #[derive(Component, Clone, Debug, Serialize, Deserialize)]
-pub struct Player {
-    pub id: Uuid,
+pub struct Player;
+
+#[derive(Component, Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct InternalEntity(Uuid);
+
+impl InternalEntity {
+    pub fn new(uuid: Uuid) -> Self {
+        Self(uuid)
+    }
 }
 
 impl Position {
@@ -52,14 +60,8 @@ impl Position {
     }
 }
 
-impl Player {
-    pub fn new(id: Uuid) -> Self {
-        Self { id }
-    }
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WorldState {
-    pub player_1: Player,
+    pub player_1_internal_entity: InternalEntity,
     pub player_1_position: Position,
 }

@@ -1,12 +1,13 @@
 use crate::internal_commands::InternalCommand;
 use crate::systems::ServerEventSender;
 use bevy::prelude::{Commands, Entity, Query, Res};
-use shared::{Player, Position};
-use tracing::info;
+use shared::ServerEvent::InitialWorldState;
+use shared::{InternalEntity, Player, Position, WorldState};
+use tracing::{debug, error, info};
 
 pub fn process_internal_commands(
     mut commands: Commands,
-    player_query: Query<(Entity, &Player, &Position)>,
+    player_query: Query<(Entity, &Player, Option<&InternalEntity>, &Position)>,
     channel: Res<ServerEventSender>,
 ) {
     while let Ok(internal_command) = channel.rx_internal_server_commands.try_recv() {
@@ -15,21 +16,48 @@ pub fn process_internal_commands(
             internal_command
         );
         match internal_command {
-            InternalCommand::PlayerConnected(uuid) => {
-                info!("spawning player with uuid {:?} at (0, 0)", uuid);
-                let spawn_position = Position::new(0, 0);
-                let player = Player::new(uuid);
-                info!("actually spawning");
-                commands.spawn((player, spawn_position));
-            }
-            InternalCommand::PlayerDisconnected(uuid) => {
-                info!("de-spawning player with uuid {:?} at (0, 0)", uuid);
-                player_query.iter().for_each(|(entity, player, _position)| {
-                    if player.id == uuid {
-                        info!("actually de-spawning");
-                        commands.entity(entity).despawn()
+            InternalCommand::PlayerConnected(internal_entity) => {
+                info!(
+                    "attaching tracked_entity {:?}",
+                    internal_entity.clone()
+                );
+
+                let (entity, _, _, position) = player_query.get_single().unwrap();
+                info!(
+                    "attaching tracked_entity {:?} to player at {:?}",
+                    internal_entity.clone(),
+                    position.clone()
+                );
+
+                commands
+                    .entity(entity)
+                    .insert(internal_entity.clone());
+
+                match channel
+                    .tx_server_events
+                    .try_send(InitialWorldState(WorldState {
+                        player_1_internal_entity: internal_entity.clone(),
+                        player_1_position: position.clone(),
+                    })) {
+                    Ok(_) => {
+                        debug!("Updated world state");
                     }
-                });
+                    Err(e) => {
+                        error!("Failed to update world state: {:?}", e);
+                    }
+                }
+            }
+            InternalCommand::PlayerDisconnected(disconnected_internal_entity) => {
+                info!(
+                    "de-spawning player with uuid {:?} at (0, 0)",
+                    disconnected_internal_entity
+                );
+
+                let (entity, _, _, _) = player_query.get_single().unwrap();
+
+                commands
+                    .entity(entity)
+                    .remove::<InternalEntity>();
             }
         }
     }

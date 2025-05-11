@@ -9,7 +9,7 @@ use bevy::tasks::IoTaskPool;
 use bevy::tasks::futures_lite::AsyncWriteExt;
 use bincode;
 use futures::FutureExt;
-use shared::{ClientCommand, ServerEvent};
+use shared::{ClientCommand, InternalEntity, ServerEvent};
 use std::time::Duration;
 use tracing::{error, info, instrument, warn};
 use uuid::Uuid;
@@ -19,7 +19,7 @@ const SLEEP_TIME_FOR_TARGET_TICK: u64 = 1000 / TARGET_SERVER_TICK;
 
 #[derive(Resource)]
 pub struct ClientCommandReceiver {
-    pub(crate) rx_client_commands: Receiver<ClientCommand>,
+    pub(crate) rx_client_commands: Receiver<(Uuid, ClientCommand)>,
 }
 
 #[derive(Resource)]
@@ -55,7 +55,7 @@ pub fn setup_connection_resources(mut commands: Commands) {
 }
 
 async fn setup_connection_handler(
-    client_command_sender: Sender<ClientCommand>,
+    client_command_sender: Sender<(Uuid, ClientCommand)>,
     server_event_receiver: Receiver<ServerEvent>,
     tx_internal_server_commands: Sender<InternalCommand>,
 ) {
@@ -67,9 +67,10 @@ async fn setup_connection_handler(
         if let Ok((stream, addr)) = listener.accept().await {
             info!("New connection from: {}", addr);
 
-            let uuid = Uuid::new_v4();
+            let addr_str = addr.to_string();
+            let uuid = Uuid::new_v5(&Uuid::NAMESPACE_DNS, addr_str.as_bytes());
             tx_internal_server_commands
-                .send(PlayerConnected(uuid))
+                .send(PlayerConnected(InternalEntity::new(uuid)))
                 .await
                 .unwrap();
 
@@ -92,7 +93,7 @@ async fn setup_connection_handler(
 async fn handle_client(
     uuid: Uuid,
     mut stream: TcpStream,
-    tx_client_commands: Sender<ClientCommand>,
+    tx_client_commands: Sender<(Uuid, ClientCommand)>,
     tx_internal_server_commands: Sender<InternalCommand>,
     rx_server_commands: Receiver<ServerEvent>,
 ) {
@@ -117,13 +118,13 @@ async fn handle_client(
                     Ok(n) if n > 0 => {
                         let command: ClientCommand = bincode::deserialize(&buf[..n]).unwrap();
                         info!("Received command from client: {:?}", command);
-                        tx_client_commands.send(command).await.expect("Failed to forward command");
+                        tx_client_commands.send((uuid, command)).await.expect("Failed to forward command");
                     }
                     Ok(_) => {
                         warn!("Client closed the connection");
 
                         tx_internal_server_commands
-                            .send(PlayerDisconnected(uuid))
+                            .send(PlayerDisconnected(InternalEntity::new(uuid)))
                             .await
                             .unwrap();
 

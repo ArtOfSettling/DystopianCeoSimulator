@@ -1,13 +1,15 @@
-use crate::systems::ClientCommandReceiver;
+use crate::systems::{
+    FanOutClientCommandReceiver
+};
 use bevy::prelude::{Query, Res};
-use shared::{ClientCommand, Player, PlayerAction, Position};
+use shared::{ClientCommand, InternalEntity, Player, PlayerAction, Position};
 use tracing::info;
 
 pub fn process_client_commands(
-    channel: Res<ClientCommandReceiver>,
-    mut player_query: Query<(&Player, &mut Position)>,
+    channel: Res<FanOutClientCommandReceiver>,
+    mut player_query: Query<(&Player, Option<&InternalEntity>, &mut Position)>,
 ) {
-    while let Ok(client_command) = channel.rx_client_commands.try_recv() {
+    while let Ok((_, client_command)) = channel.rx_fan_out_client_commands.try_recv() {
         info!(
             "Server has clients command for processing {:?}",
             client_command
@@ -15,22 +17,22 @@ pub fn process_client_commands(
         match client_command {
             ClientCommand::PlayerAction(player_action) => match player_action {
                 PlayerAction::MovePlayerLocalUp => {
-                    for (_player, mut position) in &mut player_query {
+                    for (_player, _internal_entity, mut position) in &mut player_query {
                         position.y += 1;
                     }
                 }
                 PlayerAction::MovePlayerLocalRight => {
-                    for (_player, mut position) in &mut player_query {
+                    for (_player, _internal_entity, mut position) in &mut player_query {
                         position.x += 1;
                     }
                 }
                 PlayerAction::MovePlayerLocalDown => {
-                    for (_player, mut position) in &mut player_query {
+                    for (_player, _internal_entity, mut position) in &mut player_query {
                         position.y -= 1;
                     }
                 }
                 PlayerAction::MovePlayerLocalLeft => {
-                    for (_player, mut position) in &mut player_query {
+                    for (_player, _internal_entity, mut position) in &mut player_query {
                         position.x -= 1;
                     }
                 }

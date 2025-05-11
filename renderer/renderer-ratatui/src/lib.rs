@@ -6,7 +6,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
 };
 use renderer_api::{Renderer, RendererResource};
-use shared::{Player, Position};
+use shared::{InternalEntity, Player, Position};
 use std::io;
 use tracing::{debug, error};
 
@@ -29,14 +29,14 @@ impl Plugin for RatatuiRendererPlugin {
 }
 
 impl Renderer for RatatuiRenderer {
-    fn render(&mut self, player_query: Query<(&Player, &Position)>) {
+    fn render(&mut self, player_query: Query<(&Player, &InternalEntity, &Position)>) {
         match self.terminal.draw(|frame| {
             let connected_player_information = player_query
                 .iter()
-                .map(|(player, position)| {
+                .map(|(_player, internal_entity, position)| {
                     format!(
                         "player_id: ({:?}) is at ({:?}, {:?})",
-                        player.id, position.x, position.y
+                        internal_entity, position.x, position.y
                     )
                 })
                 .collect::<Vec<String>>()
@@ -58,7 +58,7 @@ impl Renderer for RatatuiRenderer {
 
 fn render_system(
     mut render_resource: ResMut<RendererResource>,
-    player_query: Query<(&Player, &Position)>,
+    player_query: Query<(&Player, &InternalEntity, &Position)>,
 ) {
     render_resource.renderer.render(player_query);
 }
