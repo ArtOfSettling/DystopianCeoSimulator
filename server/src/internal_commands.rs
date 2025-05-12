@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use shared::InternalEntity;
+use shared::components::InternalEntity;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum InternalCommand {

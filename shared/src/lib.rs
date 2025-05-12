@@ -1,4 +1,9 @@
-use bevy::prelude::Component;
+pub mod components;
+pub mod resources;
+
+use bevy::prelude::Resource;
+pub use components::*;
+pub use resources::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -11,57 +16,30 @@ pub enum ClientCommand {
 pub enum ServerEvent {
     None,
 
-    InitialWorldState(WorldState),
-    UpdatedWorldState(WorldState),
+    FullState(GameStateSnapshot),
+}
+
+#[derive(Resource, Clone, Debug, Serialize, Deserialize)]
+pub struct GameStateSnapshot {
+    pub money: f64,
+    pub reputation: i32,
+    pub employees: Vec<EmployeeSnapshot>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct EmployeeSnapshot {
+    pub id: Uuid,
+    pub name: String,
+    pub satisfaction: f64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum PlayerAction {
-    // Local Movement
-    MovePlayerLocalUp,
-    MovePlayerLocalRight,
-    MovePlayerLocalDown,
-    MovePlayerLocalLeft,
-
-    // Room Movement
-    MovePlayerRoomUp,
-    MovePlayerRoomRight,
-    MovePlayerRoomDown,
-    MovePlayerRoomLeft,
-
-    // Stairs Movement
-    GoDownStairs,
-    GoUpStairs,
-
-    ChatMessage(String),
+    FireEmployee(Uuid),
+    GiveRaise(Uuid, f64),
+    LaunchPRCampaign,
+    DoNothing,
 }
 
-#[derive(Component, Clone, Debug, Serialize, Deserialize)]
-pub struct Position {
-    pub x: i64,
-    pub y: i64,
-}
-
-#[derive(Component, Clone, Debug, Serialize, Deserialize)]
-pub struct Player;
-
-#[derive(Component, Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct InternalEntity(Uuid);
-
-impl InternalEntity {
-    pub fn new(uuid: Uuid) -> Self {
-        Self(uuid)
-    }
-}
-
-impl Position {
-    pub fn new(x: i64, y: i64) -> Self {
-        Self { x, y }
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct WorldState {
-    pub player_1_internal_entity: InternalEntity,
-    pub player_1_position: Position,
-}
+#[derive(Resource, Default, Debug)]
+pub struct PendingPlayerAction(pub Option<PlayerAction>);

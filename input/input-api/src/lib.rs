@@ -1,17 +1,23 @@
 use bevy::prelude::Resource;
-use shared::PlayerAction;
 
 #[derive(Resource)]
-pub struct InputResource {
-    pub input_handler: Box<dyn InputHandler + Send + Sync>,
-}
+pub struct InputResource {}
 
-impl InputResource {
-    pub fn new(input_handler: Box<dyn InputHandler + Send + Sync>) -> InputResource {
-        Self { input_handler }
-    }
-}
+#[derive(Resource, Default, Debug)]
+pub struct PendingPlayerInputAction(pub Option<PlayerInputAction>);
 
-pub trait InputHandler {
-    fn get_player_action(&self) -> Option<PlayerAction>;
+#[derive(Clone, Debug)]
+pub enum PlayerInputAction {
+    DoNothing,
+
+    GoBack,
+
+    LaunchPRCampaign,
+    SelectEmployeeToFire,
+    SelectEmployeeForRaise,
+
+    MenuUp,
+    MenuDown,
+    MenuLeft,
+    MenuRight,
 }

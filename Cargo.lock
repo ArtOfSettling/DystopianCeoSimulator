@@ -1086,6 +1086,7 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
@@ -2719,6 +2720,7 @@ name = "renderer-api"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "input-api",
  "shared",
 ]
 
@@ -2727,10 +2729,12 @@ name = "renderer-ratatui"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "input-api",
  "ratatui",
  "renderer-api",
  "shared",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -2859,6 +2863,7 @@ dependencies = [
  "bincode",
  "chrono",
  "futures",
+ "rand",
  "serde",
  "serde_json",
  "shared",

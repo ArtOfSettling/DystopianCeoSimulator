@@ -5,9 +5,11 @@ edition = "2024"
 
 [dependencies]
 renderer-api = { path = "../renderer-api" }
+input-api = { path = "../../input/input-api" }
 shared = { path = "../../shared" }
 ratatui = "0.29.0"
 tracing = "0.1.41"
+uuid = { version = "1.12.1", features = ["v4"] }
 
 [dependencies.bevy]
 version = "0.15.3"

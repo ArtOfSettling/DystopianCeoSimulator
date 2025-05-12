@@ -1,9 +1,12 @@
 mod systems;
 
-use crate::systems::{process_server_events, send_client_commands, setup_connection_resources};
+use crate::systems::{
+    process_server_events, send_client_commands, setup_connection_resources,
+    setup_pending_player_action, setup_world_state,
+};
 use bevy::MinimalPlugins;
 use bevy::app::{App, FixedUpdate, PluginGroup, ScheduleRunnerPlugin, Startup};
-use bevy::prelude::{Fixed, Time};
+use bevy::prelude::{Fixed, IntoSystemConfigs, Time};
 use input_crossterm::CrossTermInputPlugins;
 use renderer_ratatui::RatatuiRendererPlugin;
 use std::time::Duration;
@@ -16,12 +19,20 @@ fn main() -> anyhow::Result<()> {
 
     App::new()
         .add_plugins(MinimalPlugins.set(ScheduleRunnerPlugin::run_loop(Duration::from_millis(10))))
-        .add_plugins(RatatuiRendererPlugin {})
-        .add_plugins(CrossTermInputPlugins {})
         .insert_resource(Time::<Fixed>::from_hz(128.0))
-        .add_systems(Startup, setup_connection_resources)
+        .add_systems(
+            Startup,
+            (
+                setup_pending_player_action,
+                setup_connection_resources,
+                setup_world_state,
+            )
+                .chain(),
+        )
         .add_systems(FixedUpdate, process_server_events)
         .add_systems(FixedUpdate, send_client_commands)
+        .add_plugins(RatatuiRendererPlugin {})
+        .add_plugins(CrossTermInputPlugins {})
         .run();
 
     Ok(())

@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 shared = { path = "../../shared" }
+input-api = { path = "../../input/input-api" }
 
 [dependencies.bevy]
 version = "0.15.3"

@@ -1,9 +1,8 @@
-use bevy::app::{App, Plugin};
-use bevy::prelude::Resource;
+use bevy::app::{App, Plugin, Update};
+use bevy::prelude::{ResMut, Resource};
 use crossterm::event::{self, Event, KeyCode, poll};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
-use input_api::{InputHandler, InputResource};
-use shared::PlayerAction;
+use input_api::{InputResource, PendingPlayerInputAction, PlayerInputAction};
 use std::time::Duration;
 use tracing::info;
 
@@ -30,36 +29,43 @@ impl Drop for TerminalMode {
 impl Plugin for CrossTermInputPlugins {
     fn build(&self, app: &mut App) {
         app.insert_resource(TerminalMode::new())
-            .insert_resource(InputResource::new(Box::new(CrossTermInput {})));
+            .insert_resource(InputResource {})
+            .add_systems(Update, update_input);
     }
 }
 
-impl InputHandler for CrossTermInput {
-    fn get_player_action(&self) -> Option<PlayerAction> {
-        if poll(Duration::from_millis(1)).unwrap() {
-            if let Ok(Event::Key(key_event)) = event::read() {
-                info!("Key pressed: {:?}", key_event);
+fn update_input(mut pending_player_input_action: ResMut<PendingPlayerInputAction>) {
+    if poll(Duration::from_millis(1)).unwrap() {
+        if let Ok(Event::Key(key_event)) = event::read() {
+            info!("Key pressed: {:?}", key_event);
 
-                let command = match key_event.code {
-                    KeyCode::Char('w') => Some(PlayerAction::MovePlayerLocalUp),
-                    KeyCode::Char('d') => Some(PlayerAction::MovePlayerLocalRight),
-                    KeyCode::Char('s') => Some(PlayerAction::MovePlayerLocalDown),
-                    KeyCode::Char('a') => Some(PlayerAction::MovePlayerLocalLeft),
-                    _ => None,
-                };
-
-                if let Some(ref cmd) = command {
-                    info!("Generated command: {:?}", cmd);
-                } else {
-                    info!("No command generated for key: {:?}", key_event);
+            let command = match key_event.code {
+                KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
+                    Some(PlayerInputAction::MenuUp)
+                }
+                KeyCode::Down | KeyCode::Char('s') | KeyCode::Char('S') => {
+                    Some(PlayerInputAction::MenuDown)
+                }
+                KeyCode::Left | KeyCode::Char('a') | KeyCode::Char('A') => {
+                    Some(PlayerInputAction::MenuLeft)
+                }
+                KeyCode::Right | KeyCode::Char('d') | KeyCode::Char('D') => {
+                    Some(PlayerInputAction::MenuRight)
                 }
 
-                command
+                KeyCode::Char('p') => Some(PlayerInputAction::DoNothing),
+                KeyCode::Char('l') => Some(PlayerInputAction::LaunchPRCampaign),
+                KeyCode::Char('f') => Some(PlayerInputAction::SelectEmployeeToFire),
+                KeyCode::Char('r') => Some(PlayerInputAction::SelectEmployeeForRaise),
+                _ => None,
+            };
+
+            if let Some(action) = command {
+                info!("Generated command: {:?}", action);
+                pending_player_input_action.0 = Some(action);
             } else {
-                None
+                info!("No command generated for key: {:?}", key_event);
             }
-        } else {
-            None
         }
     }
 }

@@ -1,5 +1,6 @@
-use bevy::prelude::{Query, Resource};
-use shared::{InternalEntity, Player, Position};
+use bevy::prelude::{Res, ResMut, Resource};
+use input_api::PendingPlayerInputAction;
+use shared::{GameStateSnapshot, PendingPlayerAction};
 
 #[derive(Resource)]
 pub struct RendererResource {
@@ -13,5 +14,10 @@ impl RendererResource {
 }
 
 pub trait Renderer {
-    fn render(&mut self, player_query: Query<(&Player, &InternalEntity, &Position)>);
+    fn render(
+        &mut self,
+        game_state_snapshot: Res<GameStateSnapshot>,
+        pending_player_input_action: ResMut<PendingPlayerInputAction>,
+        pending_player_action: ResMut<PendingPlayerAction>,
+    );
 }

@@ -1,7 +1,11 @@
 mod internal_commands;
 mod systems;
 
-use crate::systems::{process_client_commands, process_fan_out_commands, process_internal_commands, process_log_commands, send_server_commands, setup_command_log, setup_command_log_replay, setup_connection_resources, setup_fanout_system, setup_world_state, sync_world_state};
+use crate::systems::{
+    process_broadcast_world_state, process_client_commands, process_fan_out_commands,
+    process_internal_commands, process_log_commands, send_server_commands, setup_command_log,
+    setup_command_log_replay, setup_connection_resources, setup_fanout_system, setup_world_state,
+};
 use bevy::MinimalPlugins;
 use bevy::app::{App, FixedUpdate, PluginGroup, ScheduleRunnerPlugin, Startup};
 use bevy::prelude::{IntoSystemConfigs, SystemSet};
@@ -38,8 +42,8 @@ fn main() -> anyhow::Result<()> {
                 process_internal_commands,
                 process_log_commands,
                 process_client_commands,
+                process_broadcast_world_state,
                 send_server_commands,
-                sync_world_state,
             ),
         )
         .run();

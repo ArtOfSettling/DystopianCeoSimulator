@@ -1,14 +1,25 @@
 use crate::systems::ClientCommandSender;
-use bevy::prelude::Res;
-use input_api::InputResource;
-use shared::ClientCommand;
+use bevy::prelude::{Res, ResMut};
+use shared::{ClientCommand, PendingPlayerAction};
 use tracing::info;
 
-pub fn send_client_commands(channel: Res<ClientCommandSender>, input_resource: Res<InputResource>) {
-    if let Some(player_action) = input_resource.input_handler.get_player_action() {
-        info!("Sending player_action Command: {:?}", player_action);
-        let _ = &channel
-            .tx_client_commands
-            .try_send(ClientCommand::PlayerAction(player_action));
+pub fn send_client_commands(
+    channel: Res<ClientCommandSender>,
+    mut pending_player_action: ResMut<PendingPlayerAction>,
+) {
+    if pending_player_action.0.is_none() {
+        return;
     }
+
+    let player_action = pending_player_action.0.clone().unwrap();
+    info!(
+        "Sending player_input_action Command: {:?}",
+        pending_player_action
+    );
+
+    let _ = &channel
+        .tx_client_commands
+        .try_send(ClientCommand::PlayerAction(player_action));
+
+    pending_player_action.0 = None;
 }

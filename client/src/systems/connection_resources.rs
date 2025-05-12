@@ -58,9 +58,15 @@ async fn handle_server(
             Either::Left((maybe_command, _)) => match maybe_command {
                 Ok(client_command) => {
                     info!("Sending client command to server: {:?}", client_command);
-                    let serialized = bincode::serialize(&client_command).unwrap();
-                    if let Err(e) = stream.write_all(&serialized).await {
-                        error!("Failed to send broadcast to server: {:?}", e);
+                    match bincode::serialize(&client_command) {
+                        Ok(serialized_command) => {
+                            if let Err(e) = stream.write_all(&serialized_command).await {
+                                error!("Failed to send broadcast to server: {:?}", e);
+                            }
+                        }
+                        Err(e) => {
+                            error!("Failed to send broadcast to server: {:?}", e);
+                        }
                     }
                 }
                 Err(e) => {
