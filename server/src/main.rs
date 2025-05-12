@@ -8,7 +8,7 @@ use crate::systems::{
 };
 use bevy::MinimalPlugins;
 use bevy::app::{App, FixedUpdate, PluginGroup, ScheduleRunnerPlugin, Startup};
-use bevy::prelude::{IntoSystemConfigs, SystemSet};
+use bevy::prelude::IntoSystemConfigs;
 use bevy::time::{Fixed, Time};
 use std::time::Duration;
 use tracing::info;

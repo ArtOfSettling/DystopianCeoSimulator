@@ -3,8 +3,7 @@ use uuid::Uuid;
 
 #[derive(Resource)]
 pub struct Company {
-    pub revenue: f64,
-    pub operating_cost: f64,
+    pub revenue: i64,
     pub public_opinion: i32,
 }
 

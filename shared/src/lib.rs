@@ -21,7 +21,7 @@ pub enum ServerEvent {
 
 #[derive(Resource, Clone, Debug, Serialize, Deserialize)]
 pub struct GameStateSnapshot {
-    pub money: f64,
+    pub money: i32,
     pub reputation: i32,
     pub employees: Vec<EmployeeSnapshot>,
 }
@@ -30,13 +30,15 @@ pub struct GameStateSnapshot {
 pub struct EmployeeSnapshot {
     pub id: Uuid,
     pub name: String,
-    pub satisfaction: f64,
+    pub satisfaction: i32,
+    pub salary: i32,
+    pub employment_status: EmploymentStatus,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum PlayerAction {
     FireEmployee(Uuid),
-    GiveRaise(Uuid, f64),
+    GiveRaise(Uuid, i32),
     LaunchPRCampaign,
     DoNothing,
 }

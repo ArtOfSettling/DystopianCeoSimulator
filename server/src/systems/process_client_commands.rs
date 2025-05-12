@@ -1,14 +1,16 @@
 use crate::NeedsWorldBroadcast;
 use crate::systems::FanOutClientCommandReceiver;
-use bevy::prelude::{Commands, Entity, Query, Res, ResMut};
-use shared::{ClientCommand, Employee, Money, PlayerAction, Reputation, Satisfaction};
+use bevy::prelude::{Mut, Query, Res, ResMut};
+use shared::{
+    ClientCommand, Employee, EmploymentStatus, Money, PlayerAction, Reputation, Salary,
+    Satisfaction,
+};
 use tracing::info;
 
 pub fn process_client_commands(
-    mut commands: Commands,
     channel: Res<FanOutClientCommandReceiver>,
     mut needs_broadcast: ResMut<NeedsWorldBroadcast>,
-    mut query: Query<(Entity, &mut Employee, &mut Satisfaction)>,
+    mut query: Query<(&mut Employee, &mut Salary, &mut Satisfaction)>,
     mut money: Query<&mut Money>,
     mut reputation: Query<&mut Reputation>,
 ) {
@@ -20,33 +22,20 @@ pub fn process_client_commands(
         match client_command {
             ClientCommand::PlayerAction(player_action) => match player_action {
                 PlayerAction::FireEmployee(target_id) => {
-                    for (entity, employee, _) in query.iter_mut() {
+                    let mut reputation = reputation.single_mut();
+                    for (mut employee, _salary, _) in query.iter_mut() {
                         if employee.id == target_id {
-                            info!("Firing employee: {}", employee.name);
-                            commands.entity(entity).despawn();
-
-                            for mut rep in reputation.iter_mut() {
-                                rep.0 -= 5;
-                            }
-
-                            for mut m in money.iter_mut() {
-                                m.0 += 5000.0; // saved severance?
-                            }
-
+                            process_fire_employee(&mut employee, &mut reputation);
                             break;
                         }
                     }
                 }
 
                 PlayerAction::GiveRaise(target_id, raise_amount) => {
-                    for (_, employee, mut satisfaction) in query.iter_mut() {
+                    for (employee, mut salary, mut satisfaction) in query.iter_mut() {
                         if employee.id == target_id {
-                            satisfaction.0 += (raise_amount / 10_000.0).clamp(0.0, 0.1);
+                            process_give_raise(&mut satisfaction, &mut salary, raise_amount);
                         }
-                    }
-
-                    for mut m in money.iter_mut() {
-                        m.0 -= raise_amount;
                     }
                 }
 
@@ -56,7 +45,7 @@ pub fn process_client_commands(
                     }
 
                     for mut m in money.iter_mut() {
-                        m.0 -= 10000.0;
+                        m.0 -= 10000;
                     }
                 }
 
@@ -68,4 +57,19 @@ pub fn process_client_commands(
 
         needs_broadcast.0 = true;
     }
+}
+
+fn process_give_raise(
+    satisfaction: &mut Mut<Satisfaction>,
+    salary: &mut Mut<Salary>,
+    raise_amount: i32,
+) {
+    satisfaction.0 += 1;
+    salary.0 += raise_amount;
+}
+
+fn process_fire_employee(employee: &mut Mut<Employee>, reputation: &mut Mut<Reputation>) {
+    info!("Firing employee: {}", employee.name);
+    employee.employment_status = EmploymentStatus::Fired;
+    reputation.0 = reputation.0 - 1;
 }

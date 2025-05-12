@@ -6,7 +6,7 @@ use uuid::Uuid;
 pub struct Player;
 
 #[derive(Component, Clone, Debug, Serialize, Deserialize)]
-pub struct Money(pub f64);
+pub struct Money(pub i32);
 
 #[derive(Component, Clone, Debug, Serialize, Deserialize)]
 pub struct Reputation(pub i32);
@@ -19,16 +19,23 @@ pub struct Employee {
     pub id: Uuid,
     pub name: String,
     pub role: String,
+    pub employment_status: EmploymentStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum EmploymentStatus {
+    Active,
+    Fired,
 }
 
 #[derive(Component)]
-pub struct Satisfaction(pub f64);
+pub struct Satisfaction(pub i32);
 
 #[derive(Component)]
-pub struct Productivity(pub f64);
+pub struct Productivity(pub i32);
 
 #[derive(Component)]
-pub struct Salary(pub f64);
+pub struct Salary(pub i32);
 
 #[derive(Component)]
 pub struct EmployeeFlags(pub Vec<EmployeeFlag>);

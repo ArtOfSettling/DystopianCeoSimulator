@@ -3,14 +3,14 @@ use crate::systems::ServerEventSender;
 use bevy::prelude::{Query, Res, ResMut};
 use shared::{
     Employee, EmployeeSnapshot, GameStateSnapshot, InternalEntity, Money, Player, Reputation,
-    Satisfaction, ServerEvent, Week,
+    Salary, Satisfaction, ServerEvent, Week,
 };
 
 pub fn process_broadcast_world_state(
     mut needs_broadcast: ResMut<NeedsWorldBroadcast>,
     query_money: Query<&Money>,
     query_rep: Query<&Reputation>,
-    query_employees: Query<(&Employee, &Satisfaction)>,
+    query_employees: Query<(&Employee, &Salary, &Satisfaction)>,
     query_player: Query<(&Player, &Money, &Reputation, &Week, Option<&InternalEntity>)>,
     server_event_sender: Res<ServerEventSender>,
 ) {
@@ -31,10 +31,12 @@ pub fn process_broadcast_world_state(
 
     let employees = query_employees
         .iter()
-        .map(|(emp, sat)| EmployeeSnapshot {
+        .map(|(emp, sal, sat)| EmployeeSnapshot {
             id: emp.id,
             name: emp.name.clone(),
             satisfaction: sat.0,
+            employment_status: emp.employment_status.clone(),
+            salary: sal.0,
         })
         .collect();
 

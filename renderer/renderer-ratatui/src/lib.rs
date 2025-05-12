@@ -8,7 +8,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders};
 use ratatui::{Terminal, backend::CrosstermBackend, widgets::Paragraph};
 use renderer_api::{Renderer, RendererResource};
-use shared::{GameStateSnapshot, PendingPlayerAction, PlayerAction};
+use shared::{EmploymentStatus, GameStateSnapshot, PendingPlayerAction, PlayerAction};
 use std::io;
 use tracing::{debug, error, info};
 
@@ -64,7 +64,7 @@ impl Renderer for RatatuiRenderer {
                 PlayerInputAction::SelectEmployeeForRaise => {
                     pending_player_action.0 = Some(PlayerAction::GiveRaise(
                         game_state_snapshot.employees[self.selected_employee].id,
-                        100.0,
+                        100,
                     ))
                 }
                 PlayerInputAction::LaunchPRCampaign => {
@@ -91,8 +91,14 @@ impl Renderer for RatatuiRenderer {
                 .split(main_chunks[0]);
 
             let stats = format!(
-                "Money: ${:.2}\nReputation: {}",
-                game_state_snapshot.money, game_state_snapshot.reputation
+                "Money: ${:.2}\nReputation: {}\nOperating Expenses: {}",
+                game_state_snapshot.money,
+                game_state_snapshot.reputation,
+                game_state_snapshot
+                    .employees
+                    .iter()
+                    .filter(|emp| emp.employment_status == EmploymentStatus::Active)
+                    .fold(0, |sum, val| sum + val.salary)
             );
             let stats_widget =
                 Paragraph::new(Text::raw(stats)).style(Style::default().fg(Color::White));
@@ -103,7 +109,10 @@ impl Renderer for RatatuiRenderer {
                 .iter()
                 .enumerate()
                 .map(|(i, emp)| {
-                    let line = format!("{} - Satisfaction: {:.2}", emp.name, emp.satisfaction);
+                    let line = format!(
+                        "{} - Satisfaction: {:.2}, Employment Status: {:?}",
+                        emp.name, emp.satisfaction, emp.employment_status
+                    );
                     if i == self.selected_employee {
                         Line::from(Span::styled(
                             line,

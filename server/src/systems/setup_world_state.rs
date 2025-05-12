@@ -2,19 +2,18 @@ use bevy::prelude::Commands;
 use rand::Rng;
 use rand::seq::SliceRandom;
 use shared::{
-    Company, Employee, EmployeeFlags, Money, Player, Productivity, Reputation, Salary,
-    Satisfaction, Week,
+    Company, Employee, EmployeeFlags, EmploymentStatus, Money, Player, Productivity, Reputation,
+    Salary, Satisfaction, Week,
 };
 use tracing::info;
 use uuid::Uuid;
 
 pub fn setup_world_state(mut commands: Commands) {
     info!("spawning player");
-    commands.spawn((Player, Money(100_000.0), Reputation(50), Week(1)));
+    commands.spawn((Player, Money(1_000_000), Reputation(50), Week(1)));
 
     commands.insert_resource(Company {
-        revenue: 0.0,
-        operating_cost: 0.0,
+        revenue: 0,
         public_opinion: 50,
     });
 
@@ -26,15 +25,16 @@ pub fn setup_world_state(mut commands: Commands) {
     for _ in 0..3 {
         let name = names.choose(&mut rng).unwrap().to_string();
         let role = roles.choose(&mut rng).unwrap().to_string();
-        let salary = rng.gen_range(40_000.0..80_000.0);
-        let satisfaction = rng.gen_range(0.4..0.8);
-        let productivity = rng.gen_range(0.3..0.9);
+        let salary = rng.gen_range(40_000..80_000);
+        let satisfaction = rng.gen_range(4..8);
+        let productivity = rng.gen_range(3..9);
 
         commands.spawn((
             Employee {
                 id: Uuid::new_v4(),
                 name,
                 role,
+                employment_status: EmploymentStatus::Active,
             },
             Salary(salary),
             Satisfaction(satisfaction),
