@@ -1,12 +1,15 @@
+use crate::NeedsWorldBroadcast;
 use crate::internal_commands::InternalCommand;
 use crate::systems::ServerEventSender;
-use bevy::prelude::{Commands, Entity, Query, Res};
+use bevy::prelude::{Commands, Entity, Query, Res, ResMut};
 use shared::components::InternalEntity;
 use shared::{Money, Player, Reputation, Week};
 use tracing::info;
 
 pub fn process_internal_commands(
     mut commands: Commands,
+    mut needs_broadcast: ResMut<NeedsWorldBroadcast>,
+    channel: Res<ServerEventSender>,
     player_query: Query<(
         Entity,
         &Player,
@@ -15,7 +18,6 @@ pub fn process_internal_commands(
         &Week,
         Option<&InternalEntity>,
     )>,
-    channel: Res<ServerEventSender>,
 ) {
     while let Ok(internal_command) = channel.rx_internal_server_commands.try_recv() {
         info!(
@@ -33,6 +35,7 @@ pub fn process_internal_commands(
                 );
 
                 commands.entity(entity).insert(internal_entity.clone());
+                needs_broadcast.0 = true;
             }
             InternalCommand::PlayerDisconnected(disconnected_internal_entity) => {
                 info!(

@@ -1,11 +1,13 @@
+use crate::NeedsWorldBroadcast;
 use crate::systems::FanOutClientCommandReceiver;
-use bevy::prelude::{Commands, Entity, Query, Res};
+use bevy::prelude::{Commands, Entity, Query, Res, ResMut};
 use shared::{ClientCommand, Employee, Money, PlayerAction, Reputation, Satisfaction};
 use tracing::info;
 
 pub fn process_client_commands(
     mut commands: Commands,
     channel: Res<FanOutClientCommandReceiver>,
+    mut needs_broadcast: ResMut<NeedsWorldBroadcast>,
     mut query: Query<(Entity, &mut Employee, &mut Satisfaction)>,
     mut money: Query<&mut Money>,
     mut reputation: Query<&mut Reputation>,
@@ -63,5 +65,7 @@ pub fn process_client_commands(
                 }
             },
         }
+
+        needs_broadcast.0 = true;
     }
 }

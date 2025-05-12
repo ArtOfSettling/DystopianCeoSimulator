@@ -14,8 +14,8 @@ use std::time::Duration;
 use tracing::info;
 use tracing_appender::non_blocking::WorkerGuard;
 
-#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
-pub struct InitSystems;
+#[derive(Default, Resource)]
+pub struct NeedsWorldBroadcast(pub bool);
 
 fn main() -> anyhow::Result<()> {
     let _guard = setup_logging();
@@ -24,6 +24,7 @@ fn main() -> anyhow::Result<()> {
     App::new()
         .add_plugins(MinimalPlugins.set(ScheduleRunnerPlugin::run_loop(Duration::from_millis(10))))
         .insert_resource(Time::<Fixed>::from_hz(128.0))
+        .insert_resource(NeedsWorldBroadcast::default())
         .add_systems(
             Startup,
             (
