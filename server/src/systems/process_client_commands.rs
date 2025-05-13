@@ -100,10 +100,16 @@ pub fn process_client_commands(
                     info!("Player did nothing this turn.");
                 }
 
-                PlayerAction::PromoteToVp { target_id, employee_id } => {
+                PlayerAction::PromoteToVp {
+                    target_id,
+                    employee_id,
+                } => {
                     internal_event_sender
                         .tx_internal_events
-                        .try_send(InternalEvent::SetOrgVp { target_id, employee_id })
+                        .try_send(InternalEvent::SetOrgVp {
+                            target_id,
+                            employee_id,
+                        })
                         .unwrap();
                 }
             },

@@ -75,6 +75,7 @@ pub struct OrganizationSnapshot {
 pub struct EmployeeSnapshot {
     pub id: Uuid,
     pub name: String,
+    pub level: u32,
     pub satisfaction: i32,
     pub employment_status: EmploymentStatus,
     pub salary: i32,
@@ -89,7 +90,7 @@ pub enum PlayerAction {
     GiveRaise(Uuid, u32),
     LaunchPRCampaign,
     DoNothing,
-    PromoteToVp { target_id: Uuid, employee_id: Uuid }
+    PromoteToVp { target_id: Uuid, employee_id: Uuid },
 }
 
 #[derive(Resource, Default, Debug)]

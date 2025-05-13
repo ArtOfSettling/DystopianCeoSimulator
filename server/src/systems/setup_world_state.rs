@@ -1,7 +1,7 @@
 use bevy::prelude::Commands;
 use shared::{
-    Company, Employee, EmployeeFlag, EmployeeFlags, EmploymentStatus, Money, OrgRole, Organization,
-    OrganizationMember, Player, Productivity, Reputation, Salary, Satisfaction, Week,
+    Company, Employee, EmployeeFlag, EmployeeFlags, EmploymentStatus, Level, Money, OrgRole,
+    Organization, OrganizationMember, Player, Productivity, Reputation, Salary, Satisfaction, Week,
 };
 use tracing::info;
 use uuid::Uuid;
@@ -38,6 +38,7 @@ pub fn setup_world_state(mut commands: Commands) {
             organization_id: org1_id,
             role: OrgRole::VP,
         },
+        Level(10_000),
         Satisfaction(85),
         Productivity(90),
         Salary(12_000),
@@ -56,6 +57,7 @@ pub fn setup_world_state(mut commands: Commands) {
             organization_id: org1_id,
             role: OrgRole::Employee,
         },
+        Level(10_000),
         Satisfaction(70),
         Productivity(75),
         Salary(8_000),
@@ -73,6 +75,7 @@ pub fn setup_world_state(mut commands: Commands) {
             organization_id: org1_id,
             role: OrgRole::Employee,
         },
+        Level(10_000),
         Satisfaction(60),
         Productivity(65),
         Salary(7_500),
@@ -91,6 +94,7 @@ pub fn setup_world_state(mut commands: Commands) {
             organization_id: org2_id,
             role: OrgRole::VP,
         },
+        Level(10_000),
         Satisfaction(90),
         Productivity(95),
         Salary(13_000),
@@ -109,6 +113,7 @@ pub fn setup_world_state(mut commands: Commands) {
             organization_id: org2_id,
             role: OrgRole::Employee,
         },
+        Level(10_000),
         Satisfaction(75),
         Productivity(70),
         Salary(6_500),
@@ -126,6 +131,7 @@ pub fn setup_world_state(mut commands: Commands) {
             organization_id: org2_id,
             role: OrgRole::Employee,
         },
+        Level(10_000),
         Satisfaction(80),
         Productivity(80),
         Salary(7_000),

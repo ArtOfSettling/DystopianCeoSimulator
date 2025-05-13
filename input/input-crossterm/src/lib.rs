@@ -1,8 +1,10 @@
 use bevy::app::{App, Plugin, Update};
 use bevy::prelude::{ResMut, Resource};
 use crossterm::event::{self, Event, KeyCode, poll};
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
+use crossterm::execute;
+use crossterm::terminal::{EnterAlternateScreen, disable_raw_mode, enable_raw_mode};
 use input_api::{InputResource, PendingPlayerInputAction, PlayerInputAction};
+use std::io::stdout;
 use std::time::Duration;
 use tracing::info;
 
@@ -16,6 +18,7 @@ pub struct TerminalMode {}
 impl TerminalMode {
     fn new() -> Self {
         enable_raw_mode().unwrap();
+        execute!(stdout(), EnterAlternateScreen).unwrap();
         Self {}
     }
 }
@@ -40,6 +43,8 @@ fn update_input(mut pending_player_input_action: ResMut<PendingPlayerInputAction
             info!("Key pressed: {:?}", key_event);
 
             let command = match key_event.code {
+                KeyCode::Esc => Some(PlayerInputAction::GoBack),
+                KeyCode::Enter => Some(PlayerInputAction::MenuSelect),
                 KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
                     Some(PlayerInputAction::MenuUp)
                 }
@@ -58,6 +63,7 @@ fn update_input(mut pending_player_input_action: ResMut<PendingPlayerInputAction
                 KeyCode::Char('l') => Some(PlayerInputAction::LaunchPRCampaign),
                 KeyCode::Char('f') => Some(PlayerInputAction::SelectEmployeeToFire),
                 KeyCode::Char('r') => Some(PlayerInputAction::SelectEmployeeForRaise),
+
                 _ => None,
             };
 

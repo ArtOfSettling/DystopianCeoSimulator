@@ -52,6 +52,9 @@ pub enum EmploymentStatus {
 pub struct Satisfaction(pub i32);
 
 #[derive(Component)]
+pub struct Level(pub u32);
+
+#[derive(Component)]
 pub struct Productivity(pub i32);
 
 #[derive(Component)]

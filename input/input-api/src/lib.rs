@@ -21,4 +21,6 @@ pub enum PlayerInputAction {
     MenuDown,
     MenuLeft,
     MenuRight,
+
+    MenuSelect,
 }

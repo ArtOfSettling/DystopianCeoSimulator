@@ -1,24 +1,34 @@
+mod org_detailed_view;
+mod org_view;
+
+use crate::org_detailed_view::draw_detailed_org_view;
+use crate::org_view::draw_org_view;
 use bevy::app::{App, Plugin, Update};
 use bevy::prelude::{Res, ResMut};
 use input_api::{PendingPlayerInputAction, PlayerInputAction};
 use ratatui::layout::{Constraint, Direction, Layout};
-use ratatui::prelude::Text;
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders};
 use ratatui::{Terminal, backend::CrosstermBackend, widgets::Paragraph};
 use renderer_api::{Renderer, RendererResource};
-use shared::{EmploymentStatus, GameStateSnapshot, PendingPlayerAction, PlayerAction};
+use shared::{GameStateSnapshot, PendingPlayerAction, PlayerAction};
 use std::io;
-use tracing::{debug, error, info};
-use uuid::Uuid;
+use tracing::{debug, error};
 
 #[derive(Default)]
 pub struct RatatuiRendererPlugin {}
 
+enum UiMode {
+    OrgView,
+    DetailedOrgView,
+}
+
 pub struct RatatuiRenderer {
     terminal: Terminal<CrosstermBackend<io::Stdout>>,
     selected_index: usize,
+    selected_organization: usize,
+    ui_mode: UiMode,
 }
 
 impl Plugin for RatatuiRendererPlugin {
@@ -28,31 +38,13 @@ impl Plugin for RatatuiRendererPlugin {
         let renderer = RatatuiRenderer {
             terminal,
             selected_index: 0,
+            selected_organization: 0,
+            ui_mode: UiMode::OrgView,
         };
 
         app.insert_resource(RendererResource::new(Box::new(renderer)))
             .add_systems(Update, render_system);
     }
-}
-
-struct DisplayEntry<'a> {
-    org_name: &'a str,
-    org_vp: &'a Option<Uuid>,
-    employee: &'a shared::EmployeeSnapshot,
-}
-
-fn flatten_organization_employees<'a>(snapshot: &'a GameStateSnapshot) -> Vec<DisplayEntry<'a>> {
-    let mut result = Vec::new();
-    for org in &snapshot.organizations {
-        for employee in &org.employees {
-            result.push(DisplayEntry {
-                org_name: &org.name,
-                org_vp: &org.vp,
-                employee,
-            });
-        }
-    }
-    result
 }
 
 impl Renderer for RatatuiRenderer {
@@ -62,61 +54,109 @@ impl Renderer for RatatuiRenderer {
         mut pending_player_input_action: ResMut<PendingPlayerInputAction>,
         mut pending_player_action: ResMut<PendingPlayerAction>,
     ) {
-        let flattened = flatten_organization_employees(&game_state_snapshot);
-        match &pending_player_input_action.0 {
-            Some(input_action) => match input_action {
-                PlayerInputAction::MenuUp => {
-                    if self.selected_index == 0 {
-                        self.selected_index = flattened.len().saturating_sub(1);
-                    } else {
-                        self.selected_index -= 1;
-                    }
-                }
-                PlayerInputAction::MenuDown => {
-                    self.selected_index += 1;
-                    if self.selected_index >= flattened.len() {
+        match self.ui_mode {
+            UiMode::OrgView => match &pending_player_input_action.0 {
+                Some(input_action) => match input_action {
+                    PlayerInputAction::MenuSelect => {
+                        self.selected_organization = self.selected_index;
+                        self.ui_mode = UiMode::DetailedOrgView;
                         self.selected_index = 0;
                     }
-                }
-                PlayerInputAction::SelectEmployeeToFire => {
-                    if let Some(entry) = flattened.get(self.selected_index) {
-                        pending_player_action.0 =
-                            Some(PlayerAction::FireEmployee(entry.employee.id));
-                    }
-                }
-                PlayerInputAction::SelectEmployeeForRaise => {
-                    if let Some(entry) = flattened.get(self.selected_index) {
-                        pending_player_action.0 =
-                            Some(PlayerAction::GiveRaise(entry.employee.id, 100));
-                    }
-                }
-                PlayerInputAction::LaunchPRCampaign => {
-                    pending_player_action.0 = Some(PlayerAction::LaunchPRCampaign)
-                }
-                PlayerInputAction::DoNothing => {
-                    pending_player_action.0 = Some(PlayerAction::DoNothing)
-                }
-                PlayerInputAction::PromoteToVP => {
-                    if let Some(entry) = flattened.get(self.selected_index) {
-                        if let Some(org) = game_state_snapshot
-                            .organizations
-                            .iter()
-                            .find(|org| org.employees.iter().any(|emp| emp.id == entry.employee.id))
-                        {
-                            pending_player_action.0 =
-                                Some(PlayerAction::PromoteToVp {
-                                    target_id: org.id,
-                                    employee_id: entry.employee.id,
-                                });
+                    PlayerInputAction::MenuUp => {
+                        if self.selected_index == 0 {
+                            self.selected_index = game_state_snapshot.organizations.len() - 1;
+                        } else {
+                            self.selected_index -= 1;
                         }
                     }
-                }
-                _ => {
-                    info!("Unknown action: {:?}", input_action);
-                }
+                    PlayerInputAction::MenuDown => {
+                        self.selected_index += 1;
+                        if self.selected_index >= game_state_snapshot.organizations.len() {
+                            self.selected_index = 0;
+                        }
+                    }
+                    _ => {}
+                },
+                _ => {}
             },
-            _ => {}
+            UiMode::DetailedOrgView => match &pending_player_input_action.0 {
+                Some(input_action) => match input_action {
+                    PlayerInputAction::GoBack => {
+                        self.selected_organization = 0;
+                        self.ui_mode = UiMode::OrgView;
+                    }
+                    PlayerInputAction::MenuSelect => {}
+                    PlayerInputAction::MenuUp => {
+                        if self.selected_index == 0 {
+                            self.selected_index = game_state_snapshot.organizations
+                                [self.selected_organization]
+                                .employees
+                                .len()
+                                - 1;
+                        } else {
+                            self.selected_index -= 1;
+                        }
+                    }
+                    PlayerInputAction::MenuDown => {
+                        self.selected_index += 1;
+                        if self.selected_index
+                            >= game_state_snapshot.organizations[self.selected_organization]
+                                .employees
+                                .len()
+                        {
+                            self.selected_index = 0;
+                        }
+                    }
+
+                    PlayerInputAction::SelectEmployeeToFire => {
+                        if let Some(employee) = game_state_snapshot.organizations
+                            [self.selected_organization]
+                            .employees
+                            .get(self.selected_index)
+                        {
+                            pending_player_action.0 = Some(PlayerAction::FireEmployee(employee.id));
+                        }
+                    }
+                    PlayerInputAction::SelectEmployeeForRaise => {
+                        if let Some(employee) = game_state_snapshot.organizations
+                            [self.selected_organization]
+                            .employees
+                            .get(self.selected_index)
+                        {
+                            pending_player_action.0 =
+                                Some(PlayerAction::GiveRaise(employee.id, 100));
+                        }
+                    }
+                    PlayerInputAction::LaunchPRCampaign => {
+                        pending_player_action.0 = Some(PlayerAction::LaunchPRCampaign)
+                    }
+                    PlayerInputAction::DoNothing => {
+                        pending_player_action.0 = Some(PlayerAction::DoNothing)
+                    }
+                    PlayerInputAction::PromoteToVP => {
+                        if let Some(employee) = game_state_snapshot.organizations
+                            [self.selected_organization]
+                            .employees
+                            .get(self.selected_index)
+                        {
+                            if let Some(org) = game_state_snapshot
+                                .organizations
+                                .iter()
+                                .find(|org| org.employees.iter().any(|emp| emp.id == employee.id))
+                            {
+                                pending_player_action.0 = Some(PlayerAction::PromoteToVp {
+                                    target_id: org.id,
+                                    employee_id: employee.id,
+                                });
+                            }
+                        }
+                    }
+                    _ => {}
+                },
+                _ => {}
+            },
         }
+
         pending_player_input_action.0 = None;
 
         match self.terminal.draw(|frame| {
@@ -126,76 +166,24 @@ impl Renderer for RatatuiRenderer {
                 .constraints([Constraint::Min(0), Constraint::Length(1)])
                 .split(frame.area());
 
-            let inner_chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Percentage(20), Constraint::Percentage(80)].as_ref())
-                .split(main_chunks[0]);
-
-            let stats = format!(
-                "Money: ${:.2}\nReputation: {}\nOperating Expenses: {}",
-                game_state_snapshot.money,
-                game_state_snapshot.reputation,
-                game_state_snapshot
-                    .organizations
-                    .iter()
-                    .flat_map(|org| org
-                        .employees
-                        .iter()
-                        .filter(|emp| emp.employment_status == EmploymentStatus::Active))
-                    .fold(0, |sum, val| sum + val.salary)
-            );
-            let stats_widget =
-                Paragraph::new(Text::raw(stats)).style(Style::default().fg(Color::White));
-            frame.render_widget(stats_widget, inner_chunks[0]);
-
-            let mut lines = vec![];
-            let mut current_org = "";
-
-            for (i, entry) in flattened.iter().enumerate() {
-                if entry.org_name != current_org {
-                    current_org = entry.org_name;
-                    let vp_name = entry.org_vp.and_then(|vp_id| {
-                        flattened
-                            .iter()
-                            .find(|emp| emp.employee.id == vp_id)
-                            .map(|emp| emp.employee.name.clone())
-                    });
-                    lines.push(Line::from(Span::styled(
-                        format!("Org: {}, VP: {:?}", current_org, vp_name),
-                        Style::default()
-                            .fg(Color::Cyan)
-                            .add_modifier(Modifier::BOLD),
-                    )));
+            match self.ui_mode {
+                UiMode::OrgView => {
+                    draw_org_view(
+                        frame,
+                        main_chunks[0],
+                        &game_state_snapshot,
+                        self.selected_index,
+                    );
                 }
-
-                let emp_line = format!(
-                    "  {} - Satisfaction: {}, Status: {:?}, Salary: {}",
-                    entry.employee.name,
-                    entry.employee.satisfaction,
-                    entry.employee.employment_status,
-                    entry.employee.salary,
-                );
-
-                if i == self.selected_index {
-                    lines.push(Line::from(Span::styled(
-                        emp_line,
-                        Style::default().fg(Color::Black).bg(Color::White),
-                    )));
-                } else {
-                    lines.push(Line::from(Span::styled(
-                        emp_line,
-                        Style::default().fg(Color::Yellow),
-                    )));
+                UiMode::DetailedOrgView => {
+                    draw_detailed_org_view(
+                        frame,
+                        main_chunks[0],
+                        &game_state_snapshot.organizations[self.selected_organization],
+                        self.selected_index,
+                    );
                 }
             }
-
-            let employee_list = Paragraph::new(lines).block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title("Employees by Org"),
-            );
-
-            frame.render_widget(employee_list, inner_chunks[1]);
 
             let help_line = Line::from(vec![
                 Span::styled(
@@ -227,7 +215,7 @@ impl Renderer for RatatuiRenderer {
             Err(_) => {
                 error!("Render Error");
             }
-        }
+        };
     }
 }
 

@@ -90,7 +90,10 @@ pub fn process_internal_events(
                 week.0 += 1;
             }
 
-            InternalEvent::SetOrgVp { target_id, employee_id } => {
+            InternalEvent::SetOrgVp {
+                target_id,
+                employee_id,
+            } => {
                 for mut org in organizations.iter_mut() {
                     if org.id == target_id {
                         org.vp = Some(employee_id);

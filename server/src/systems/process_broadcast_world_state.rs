@@ -2,7 +2,7 @@ use crate::NeedsWorldBroadcast;
 use crate::systems::ServerEventSender;
 use bevy::prelude::{Query, Res, ResMut};
 use shared::{
-    Employee, EmployeeSnapshot, GameStateSnapshot, InternalEntity, Money, Organization,
+    Employee, EmployeeSnapshot, GameStateSnapshot, InternalEntity, Level, Money, Organization,
     OrganizationMember, OrganizationSnapshot, Player, Reputation, Salary, Satisfaction,
     ServerEvent, Week,
 };
@@ -15,7 +15,13 @@ pub fn process_broadcast_world_state(
     query_rep: Query<&Reputation>,
     query_player: Query<(&Player, &Money, &Reputation, &Week, Option<&InternalEntity>)>,
     query_organizations: Query<&Organization>,
-    query_org_members: Query<(&OrganizationMember, &Employee, &Salary, &Satisfaction)>,
+    query_org_members: Query<(
+        &OrganizationMember,
+        &Employee,
+        &Salary,
+        &Satisfaction,
+        &Level,
+    )>,
     server_event_sender: Res<ServerEventSender>,
 ) {
     // Only send if there's a connected player and we're due to broadcast
@@ -30,7 +36,7 @@ pub fn process_broadcast_world_state(
 
     let mut org_map: HashMap<Uuid, Vec<EmployeeSnapshot>> = HashMap::new();
 
-    for (org_member, emp, sal, sat) in query_org_members.iter() {
+    for (org_member, emp, sal, sat, lvl) in query_org_members.iter() {
         let emp_snapshot = EmployeeSnapshot {
             id: emp.id,
             name: emp.name.clone(),
@@ -38,6 +44,7 @@ pub fn process_broadcast_world_state(
             employment_status: emp.employment_status.clone(),
             salary: sal.0,
             role: emp.role.clone(),
+            level: lvl.0,
             organization_id: Some(org_member.organization_id.clone()),
             org_role: Some(org_member.role.clone()),
         };
