@@ -15,7 +15,7 @@ pub fn process_broadcast_world_state(
     server_event_sender: Res<ServerEventSender>,
 ) {
     // only send state updates if the player entity has an internal_entity. I.E. an active connection.
-    let (_, _, _, _, internal_entity) = query_player.single();
+    let (_, _, _, week, internal_entity) = query_player.single();
     if internal_entity.is_none() {
         return;
     }
@@ -28,6 +28,7 @@ pub fn process_broadcast_world_state(
 
     let money = query_money.single().0;
     let reputation = query_rep.single().0;
+    let week = week.0;
 
     let employees = query_employees
         .iter()
@@ -41,6 +42,7 @@ pub fn process_broadcast_world_state(
         .collect();
 
     let snapshot = GameStateSnapshot {
+        week,
         money,
         reputation,
         employees,

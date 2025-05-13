@@ -26,6 +26,7 @@ pub struct Employee {
 pub enum EmploymentStatus {
     Active,
     Fired,
+    Quit,
 }
 
 #[derive(Component)]

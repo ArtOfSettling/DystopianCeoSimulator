@@ -70,6 +70,9 @@ impl Renderer for RatatuiRenderer {
                 PlayerInputAction::LaunchPRCampaign => {
                     pending_player_action.0 = Some(PlayerAction::LaunchPRCampaign)
                 }
+                PlayerInputAction::DoNothing => {
+                    pending_player_action.0 = Some(PlayerAction::DoNothing)
+                }
                 _ => {
                     info!("Unknown action: {:?}", input_action);
                 }
@@ -130,6 +133,7 @@ impl Renderer for RatatuiRenderer {
             frame.render_widget(employees_widget, inner_chunks[1]);
 
             let help_line = Line::from(vec![
+                Span::styled(format!("Week: {:?}  ", game_state_snapshot.week), Style::default().fg(Color::Red)),
                 Span::styled("[W/↑] Up  ", Style::default().fg(Color::Yellow)),
                 Span::styled("[S/↓] Down  ", Style::default().fg(Color::Yellow)),
                 Span::styled("[A/←] Left  ", Style::default().fg(Color::Yellow)),

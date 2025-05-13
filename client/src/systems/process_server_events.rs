@@ -21,6 +21,7 @@ pub fn process_server_events(
     match received.unwrap() {
         ServerEvent::None => info!("Client has an empty server event"),
         ServerEvent::FullState(rx_game_state_snapshot) => {
+            game_state_snapshot.week = rx_game_state_snapshot.week;
             game_state_snapshot.money = rx_game_state_snapshot.money;
             game_state_snapshot.reputation = rx_game_state_snapshot.reputation;
             game_state_snapshot.employees = rx_game_state_snapshot.employees;

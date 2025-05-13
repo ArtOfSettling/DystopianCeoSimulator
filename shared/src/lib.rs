@@ -21,6 +21,7 @@ pub enum ServerEvent {
 
 #[derive(Resource, Clone, Debug, Serialize, Deserialize)]
 pub struct GameStateSnapshot {
+    pub week: u32,
     pub money: i32,
     pub reputation: i32,
     pub employees: Vec<EmployeeSnapshot>,

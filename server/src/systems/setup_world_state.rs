@@ -26,8 +26,8 @@ pub fn setup_world_state(mut commands: Commands) {
         let name = names.choose(&mut rng).unwrap().to_string();
         let role = roles.choose(&mut rng).unwrap().to_string();
         let salary = rng.gen_range(40_000..80_000);
-        let satisfaction = rng.gen_range(4..8);
-        let productivity = rng.gen_range(3..9);
+        let satisfaction = rng.gen_range(40..80);
+        let productivity = rng.gen_range(30..90);
 
         commands.spawn((
             Employee {
