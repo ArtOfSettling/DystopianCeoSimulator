@@ -1,3 +1,4 @@
+mod process_advance_week;
 mod process_broadcast_world_state;
 mod process_client_commands;
 mod process_fan_out_commands;
@@ -10,6 +11,7 @@ mod setup_connection_resources;
 mod setup_fanout_system;
 mod setup_world_state;
 
+pub use process_advance_week::*;
 pub use process_broadcast_world_state::*;
 pub use process_client_commands::*;
 pub use process_fan_out_commands::*;

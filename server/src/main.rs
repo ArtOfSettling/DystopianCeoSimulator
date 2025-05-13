@@ -2,9 +2,10 @@ mod internal_commands;
 mod systems;
 
 use crate::systems::{
-    process_broadcast_world_state, process_client_commands, process_fan_out_commands,
-    process_internal_commands, process_log_commands, send_server_commands, setup_command_log,
-    setup_command_log_replay, setup_connection_resources, setup_fanout_system, setup_world_state,
+    process_advance_week, process_broadcast_world_state, process_client_commands,
+    process_fan_out_commands, process_internal_commands, process_log_commands,
+    send_server_commands, setup_command_log, setup_command_log_replay, setup_connection_resources,
+    setup_fanout_system, setup_world_state,
 };
 use bevy::MinimalPlugins;
 use bevy::app::{App, FixedUpdate, PluginGroup, ScheduleRunnerPlugin, Startup};
@@ -17,6 +18,9 @@ use tracing_appender::non_blocking::WorkerGuard;
 #[derive(Default, Resource)]
 pub struct NeedsWorldBroadcast(pub bool);
 
+#[derive(Default, Resource)]
+pub struct NeedsAdvanceAWeek(pub bool);
+
 fn main() -> anyhow::Result<()> {
     let _guard = setup_logging();
     info!("Logging configured");
@@ -25,6 +29,7 @@ fn main() -> anyhow::Result<()> {
         .add_plugins(MinimalPlugins.set(ScheduleRunnerPlugin::run_loop(Duration::from_millis(10))))
         .insert_resource(Time::<Fixed>::from_hz(128.0))
         .insert_resource(NeedsWorldBroadcast::default())
+        .insert_resource(NeedsAdvanceAWeek::default())
         .add_systems(
             Startup,
             (
@@ -43,6 +48,7 @@ fn main() -> anyhow::Result<()> {
                 process_internal_commands,
                 process_log_commands,
                 process_client_commands,
+                process_advance_week,
                 process_broadcast_world_state,
                 send_server_commands,
             ),
