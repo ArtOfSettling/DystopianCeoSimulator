@@ -3,7 +3,7 @@ use bevy::prelude::{Res, ResMut};
 use input_api::{PendingPlayerInputAction, PlayerInputAction};
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::prelude::Text;
-use ratatui::style::{Color, Style};
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders};
 use ratatui::{Terminal, backend::CrosstermBackend, widgets::Paragraph};
@@ -17,7 +17,7 @@ pub struct RatatuiRendererPlugin {}
 
 pub struct RatatuiRenderer {
     terminal: Terminal<CrosstermBackend<io::Stdout>>,
-    selected_employee: usize,
+    selected_index: usize,
 }
 
 impl Plugin for RatatuiRendererPlugin {
@@ -26,12 +26,30 @@ impl Plugin for RatatuiRendererPlugin {
         let terminal = Terminal::new(backend).unwrap();
         let renderer = RatatuiRenderer {
             terminal,
-            selected_employee: 0,
+            selected_index: 0,
         };
 
         app.insert_resource(RendererResource::new(Box::new(renderer)))
             .add_systems(Update, render_system);
     }
+}
+
+struct DisplayEntry<'a> {
+    org_name: &'a str,
+    employee: &'a shared::EmployeeSnapshot,
+}
+
+fn flatten_organization_employees<'a>(snapshot: &'a GameStateSnapshot) -> Vec<DisplayEntry<'a>> {
+    let mut result = Vec::new();
+    for org in &snapshot.organizations {
+        for employee in &org.employees {
+            result.push(DisplayEntry {
+                org_name: &org.name,
+                employee,
+            });
+        }
+    }
+    result
 }
 
 impl Renderer for RatatuiRenderer {
@@ -41,31 +59,33 @@ impl Renderer for RatatuiRenderer {
         mut pending_player_input_action: ResMut<PendingPlayerInputAction>,
         mut pending_player_action: ResMut<PendingPlayerAction>,
     ) {
+        let flattened = flatten_organization_employees(&game_state_snapshot);
         match &pending_player_input_action.0 {
             Some(input_action) => match input_action {
                 PlayerInputAction::MenuUp => {
-                    if self.selected_employee <= 0 {
-                        self.selected_employee = game_state_snapshot.employees.len() - 1;
+                    if self.selected_index == 0 {
+                        self.selected_index = flattened.len().saturating_sub(1);
                     } else {
-                        self.selected_employee -= 1;
+                        self.selected_index -= 1;
                     }
                 }
                 PlayerInputAction::MenuDown => {
-                    self.selected_employee += 1;
-                    if self.selected_employee > game_state_snapshot.employees.len() - 1 {
-                        self.selected_employee = 0;
+                    self.selected_index += 1;
+                    if self.selected_index >= flattened.len() {
+                        self.selected_index = 0;
                     }
                 }
                 PlayerInputAction::SelectEmployeeToFire => {
-                    pending_player_action.0 = Some(PlayerAction::FireEmployee(
-                        game_state_snapshot.employees[self.selected_employee].id,
-                    ))
+                    if let Some(entry) = flattened.get(self.selected_index) {
+                        pending_player_action.0 =
+                            Some(PlayerAction::FireEmployee(entry.employee.id));
+                    }
                 }
                 PlayerInputAction::SelectEmployeeForRaise => {
-                    pending_player_action.0 = Some(PlayerAction::GiveRaise(
-                        game_state_snapshot.employees[self.selected_employee].id,
-                        100,
-                    ))
+                    if let Some(entry) = flattened.get(self.selected_index) {
+                        pending_player_action.0 =
+                            Some(PlayerAction::GiveRaise(entry.employee.id, 100));
+                    }
                 }
                 PlayerInputAction::LaunchPRCampaign => {
                     pending_player_action.0 = Some(PlayerAction::LaunchPRCampaign)
@@ -98,42 +118,66 @@ impl Renderer for RatatuiRenderer {
                 game_state_snapshot.money,
                 game_state_snapshot.reputation,
                 game_state_snapshot
-                    .employees
+                    .organizations
                     .iter()
-                    .filter(|emp| emp.employment_status == EmploymentStatus::Active)
+                    .flat_map(|org| org
+                        .employees
+                        .iter()
+                        .filter(|emp| emp.employment_status == EmploymentStatus::Active))
                     .fold(0, |sum, val| sum + val.salary)
             );
             let stats_widget =
                 Paragraph::new(Text::raw(stats)).style(Style::default().fg(Color::White));
             frame.render_widget(stats_widget, inner_chunks[0]);
 
-            let employee_lines = game_state_snapshot
-                .employees
-                .iter()
-                .enumerate()
-                .map(|(i, emp)| {
-                    let line = format!(
-                        "{} - Satisfaction: {:.2}, Employment Status: {:?}",
-                        emp.name, emp.satisfaction, emp.employment_status
-                    );
-                    if i == self.selected_employee {
-                        Line::from(Span::styled(
-                            line,
-                            Style::default().fg(Color::White).bg(Color::Blue),
-                        ))
-                    } else {
-                        Line::from(Span::styled(line, Style::default().fg(Color::Yellow)))
-                    }
-                })
-                .collect::<Vec<Line>>();
+            let mut lines = vec![];
+            let mut current_org = "";
 
-            let employees_widget = Paragraph::new(employee_lines)
-                .block(Block::default().borders(Borders::ALL).title("Employees"));
+            for (i, entry) in flattened.iter().enumerate() {
+                if entry.org_name != current_org {
+                    current_org = entry.org_name;
+                    lines.push(Line::from(Span::styled(
+                        format!("Org: {}", current_org),
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD),
+                    )));
+                }
 
-            frame.render_widget(employees_widget, inner_chunks[1]);
+                let emp_line = format!(
+                    "  {} - Satisfaction: {}, Status: {:?}, Salary: {}",
+                    entry.employee.name,
+                    entry.employee.satisfaction,
+                    entry.employee.employment_status,
+                    entry.employee.salary,
+                );
+
+                if i == self.selected_index {
+                    lines.push(Line::from(Span::styled(
+                        emp_line,
+                        Style::default().fg(Color::Black).bg(Color::White),
+                    )));
+                } else {
+                    lines.push(Line::from(Span::styled(
+                        emp_line,
+                        Style::default().fg(Color::Yellow),
+                    )));
+                }
+            }
+
+            let employee_list = Paragraph::new(lines).block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Employees by Org"),
+            );
+
+            frame.render_widget(employee_list, inner_chunks[1]);
 
             let help_line = Line::from(vec![
-                Span::styled(format!("Week: {:?}  ", game_state_snapshot.week), Style::default().fg(Color::Red)),
+                Span::styled(
+                    format!("Week: {:?}  ", game_state_snapshot.week),
+                    Style::default().fg(Color::Red),
+                ),
                 Span::styled("[W/↑] Up  ", Style::default().fg(Color::Yellow)),
                 Span::styled("[S/↓] Down  ", Style::default().fg(Color::Yellow)),
                 Span::styled("[A/←] Left  ", Style::default().fg(Color::Yellow)),

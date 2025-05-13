@@ -2,53 +2,70 @@ use crate::NeedsWorldBroadcast;
 use crate::systems::ServerEventSender;
 use bevy::prelude::{Query, Res, ResMut};
 use shared::{
-    Employee, EmployeeSnapshot, GameStateSnapshot, InternalEntity, Money, Player, Reputation,
-    Salary, Satisfaction, ServerEvent, Week,
+    Employee, EmployeeSnapshot, GameStateSnapshot, InternalEntity, Money, Organization,
+    OrganizationMember, OrganizationSnapshot, Player, Reputation, Salary, Satisfaction,
+    ServerEvent, Week,
 };
+use std::collections::HashMap;
+use uuid::Uuid;
 
 pub fn process_broadcast_world_state(
     mut needs_broadcast: ResMut<NeedsWorldBroadcast>,
     query_money: Query<&Money>,
     query_rep: Query<&Reputation>,
-    query_employees: Query<(&Employee, &Salary, &Satisfaction)>,
     query_player: Query<(&Player, &Money, &Reputation, &Week, Option<&InternalEntity>)>,
+    query_organizations: Query<&Organization>,
+    query_org_members: Query<(&OrganizationMember, &Employee, &Salary, &Satisfaction)>,
     server_event_sender: Res<ServerEventSender>,
 ) {
-    // only send state updates if the player entity has an internal_entity. I.E. an active connection.
+    // Only send if there's a connected player and we're due to broadcast
     let (_, _, _, week, internal_entity) = query_player.single();
-    if internal_entity.is_none() {
-        return;
-    }
-
-    // only send state updates if the server decides we need to broadcast.
-    if !needs_broadcast.0 {
+    if internal_entity.is_none() || !needs_broadcast.0 {
         return;
     }
     needs_broadcast.0 = false;
 
     let money = query_money.single().0;
     let reputation = query_rep.single().0;
-    let week = week.0;
 
-    let employees = query_employees
-        .iter()
-        .map(|(emp, sal, sat)| EmployeeSnapshot {
+    let mut org_map: HashMap<Uuid, Vec<EmployeeSnapshot>> = HashMap::new();
+
+    for (org_member, emp, sal, sat) in query_org_members.iter() {
+        let emp_snapshot = EmployeeSnapshot {
             id: emp.id,
             name: emp.name.clone(),
             satisfaction: sat.0,
             employment_status: emp.employment_status.clone(),
             salary: sal.0,
+            role: emp.role.clone(),
+            organization_id: Some(org_member.organization_id.clone()),
+            org_role: Some(org_member.role.clone()),
+        };
+
+        org_map
+            .entry(org_member.organization_id)
+            .or_default()
+            .push(emp_snapshot);
+    }
+
+    let organizations = query_organizations
+        .iter()
+        .map(|org| OrganizationSnapshot {
+            id: org.id,
+            name: org.name.clone(),
+            vp: org.vp,
+            employees: org_map.remove(&org.id).unwrap_or_default(),
         })
-        .collect();
+        .collect::<Vec<_>>();
 
     let snapshot = GameStateSnapshot {
-        week,
+        week: week.0,
         money,
         reputation,
-        employees,
+        organizations,
     };
 
     let _ = server_event_sender
         .tx_server_events
-        .try_send(ServerEvent::FullState(snapshot.clone()));
+        .try_send(ServerEvent::FullState(snapshot));
 }

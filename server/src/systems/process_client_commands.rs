@@ -1,14 +1,21 @@
 use crate::NeedsWorldBroadcast;
 use crate::systems::FanOutClientCommandReceiver;
 use bevy::prelude::{Mut, Query, Res, ResMut};
-use shared::{ClientCommand, Company, Employee, EmploymentStatus, Money, PlayerAction, Productivity, Reputation, Salary, Satisfaction, Week};
+use shared::{
+    ClientCommand, Employee, EmploymentStatus, Money, PlayerAction, Productivity,
+    Reputation, Salary, Satisfaction, Week,
+};
 use tracing::info;
 
 pub fn process_client_commands(
     channel: Res<FanOutClientCommandReceiver>,
-    mut company: ResMut<Company>,
     mut needs_broadcast: ResMut<NeedsWorldBroadcast>,
-    mut employees: Query<(&mut Employee, &mut Salary, &mut Satisfaction, &mut Productivity)>,
+    mut employees: Query<(
+        &mut Employee,
+        &mut Salary,
+        &mut Satisfaction,
+        &mut Productivity,
+    )>,
     mut week: Query<&mut Week>,
     mut money: Query<&mut Money>,
     mut reputation: Query<&mut Reputation>,
@@ -28,7 +35,7 @@ pub fn process_client_commands(
                             break;
                         }
                     }
-                    advance_a_week(&mut company, &mut employees, &mut week, &mut money);
+                    advance_a_week(&mut employees, &mut week, &mut money);
                 }
 
                 PlayerAction::GiveRaise(target_id, raise_amount) => {
@@ -37,7 +44,7 @@ pub fn process_client_commands(
                             process_give_raise(&mut satisfaction, &mut salary, raise_amount);
                         }
                     }
-                    advance_a_week(&mut company, &mut employees, &mut week, &mut money);
+                    advance_a_week(&mut employees, &mut week, &mut money);
                 }
 
                 PlayerAction::LaunchPRCampaign => {
@@ -48,12 +55,12 @@ pub fn process_client_commands(
                     for mut m in money.iter_mut() {
                         m.0 -= 10000;
                     }
-                    advance_a_week(&mut company, &mut employees, &mut week, &mut money);
+                    advance_a_week(&mut employees, &mut week, &mut money);
                 }
 
                 PlayerAction::DoNothing => {
                     info!("Player did nothing this turn.");
-                    advance_a_week(&mut company, &mut employees, &mut week, &mut money);
+                    advance_a_week(&mut employees, &mut week, &mut money);
                 }
             },
         }
@@ -63,8 +70,12 @@ pub fn process_client_commands(
 }
 
 fn advance_a_week(
-    company: &mut ResMut<Company>,
-    employees: &mut Query<(&mut Employee, &mut Salary, &mut Satisfaction, &mut Productivity)>,
+    employees: &mut Query<(
+        &mut Employee,
+        &mut Salary,
+        &mut Satisfaction,
+        &mut Productivity,
+    )>,
     week: &mut Query<&mut Week>,
     money: &mut Query<&mut Money>,
 ) {
@@ -81,7 +92,7 @@ fn advance_a_week(
     employees
         .iter_mut()
         .filter(|(emp, _, _, _)| emp.employment_status == EmploymentStatus::Active)
-        .for_each(|(_, _, mut sat, _)| sat.0 = (sat.0 - 1).max(0) );
+        .for_each(|(_, _, mut sat, _)| sat.0 = (sat.0 - 1).max(0));
 
     let total_productivity: i32 = employees
         .iter()

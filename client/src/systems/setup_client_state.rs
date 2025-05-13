@@ -6,6 +6,6 @@ pub fn setup_world_state(mut commands: Commands) {
         week: 1,
         money: 0,
         reputation: 0,
-        employees: vec![],
+        organizations: vec![],
     })
 }

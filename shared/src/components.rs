@@ -14,12 +14,31 @@ pub struct Reputation(pub i32);
 #[derive(Component, Clone, Debug, Serialize, Deserialize)]
 pub struct Week(pub u32);
 
+#[derive(Component, Clone, Debug, Serialize, Deserialize)]
+pub struct Organization {
+    pub id: Uuid,
+    pub name: String,
+    pub vp: Option<Uuid>, // Employee ID
+}
+
 #[derive(Component)]
 pub struct Employee {
     pub id: Uuid,
     pub name: String,
     pub role: String,
     pub employment_status: EmploymentStatus,
+}
+
+#[derive(Component, Clone, Debug, Serialize, Deserialize)]
+pub struct OrganizationMember {
+    pub organization_id: Uuid,
+    pub role: OrgRole,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum OrgRole {
+    VP,
+    Employee,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

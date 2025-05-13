@@ -24,7 +24,7 @@ pub fn process_server_events(
             game_state_snapshot.week = rx_game_state_snapshot.week;
             game_state_snapshot.money = rx_game_state_snapshot.money;
             game_state_snapshot.reputation = rx_game_state_snapshot.reputation;
-            game_state_snapshot.employees = rx_game_state_snapshot.employees;
+            game_state_snapshot.organizations = rx_game_state_snapshot.organizations;
         }
     }
 }
