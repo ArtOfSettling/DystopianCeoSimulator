@@ -96,6 +96,21 @@ impl Renderer for RatatuiRenderer {
                 PlayerInputAction::DoNothing => {
                     pending_player_action.0 = Some(PlayerAction::DoNothing)
                 }
+                PlayerInputAction::PromoteToVP => {
+                    if let Some(entry) = flattened.get(self.selected_index) {
+                        if let Some(org) = game_state_snapshot
+                            .organizations
+                            .iter()
+                            .find(|org| org.employees.iter().any(|emp| emp.id == entry.employee.id))
+                        {
+                            pending_player_action.0 =
+                                Some(PlayerAction::PromoteToVp {
+                                    target_id: org.id,
+                                    employee_id: entry.employee.id,
+                                });
+                        }
+                    }
+                }
                 _ => {
                     info!("Unknown action: {:?}", input_action);
                 }
@@ -195,7 +210,8 @@ impl Renderer for RatatuiRenderer {
                 Span::styled("[F] Fire  ", Style::default().fg(Color::Red)),
                 Span::styled("[R] Raise  ", Style::default().fg(Color::Green)),
                 Span::styled("[L] PR Campaign  ", Style::default().fg(Color::Cyan)),
-                Span::styled("[P] Do Nothing  ", Style::default().fg(Color::White)),
+                Span::styled("[P] Promote to vp  ", Style::default().fg(Color::Gray)),
+                Span::styled("[Space] Do Nothing  ", Style::default().fg(Color::White)),
                 Span::styled("[Q] Quit", Style::default().fg(Color::DarkGray)),
             ]);
 

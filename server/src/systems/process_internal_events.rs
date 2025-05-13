@@ -89,6 +89,14 @@ pub fn process_internal_events(
                 let (_, _, _, _, mut week, _) = player_query.single_mut();
                 week.0 += 1;
             }
+
+            InternalEvent::SetOrgVp { target_id, employee_id } => {
+                for mut org in organizations.iter_mut() {
+                    if org.id == target_id {
+                        org.vp = Some(employee_id);
+                    }
+                }
+            }
         }
     }
 }

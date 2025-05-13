@@ -41,6 +41,10 @@ pub enum InternalEvent {
     RemoveOrgVp {
         target_id: Uuid,
     },
+    SetOrgVp {
+        target_id: Uuid,
+        employee_id: Uuid,
+    },
     AdvanceWeek,
 }
 
@@ -85,6 +89,7 @@ pub enum PlayerAction {
     GiveRaise(Uuid, u32),
     LaunchPRCampaign,
     DoNothing,
+    PromoteToVp { target_id: Uuid, employee_id: Uuid }
 }
 
 #[derive(Resource, Default, Debug)]
