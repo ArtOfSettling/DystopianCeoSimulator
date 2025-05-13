@@ -11,7 +11,7 @@ fn current_millis() -> u64 {
         .as_millis() as u64
 }
 
-// Provides fan-out capabilities. Consumes events via the ClientCommandReceiver and fans them out
+// Provides fan-out capabilities. Consumes events via the receiver and fans them out
 // to all who need to listen.
 pub fn process_fan_out_commands(
     receiver: Res<ClientCommandReceiver>,

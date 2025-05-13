@@ -24,7 +24,7 @@ pub struct FanOutLogCommandReceiver {
     pub(crate) rx_fan_out_log_commands: Receiver<LoggedCommand>,
 }
 
-pub fn setup_fanout_system(mut commands: Commands) {
+pub fn setup_fan_out_commands(mut commands: Commands) {
     let (tx_log_commands, rx_log_commands) = unbounded();
     let (tx_client_commands, rx_client_commands) = unbounded();
 

@@ -1,4 +1,4 @@
-use crate::find_latest_log_file;
+use crate::find_latest_log_file_in_folder;
 use crate::systems::{FanOutClientCommandSender, LoggedCommand};
 use bevy::prelude::Res;
 use std::fs::File;
@@ -6,7 +6,7 @@ use std::io::{BufRead, BufReader};
 use tracing::info;
 
 pub fn setup_command_log_replay(sender: Res<FanOutClientCommandSender>) {
-    let Some(log_path) = find_latest_log_file() else {
+    let Some(log_path) = find_latest_log_file_in_folder("./_out/command_stream") else {
         info!("No valid log file found.");
         return;
     };

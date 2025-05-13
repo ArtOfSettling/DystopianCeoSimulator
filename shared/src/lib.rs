@@ -13,6 +13,38 @@ pub enum ClientCommand {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum InternalEvent {
+    SetEmployeeStatus {
+        target_id: Uuid,
+        status: EmploymentStatus,
+    },
+    DecrementReputation {
+        amount: u32,
+    },
+    DecrementMoney {
+        amount: u32,
+    },
+    IncrementEmployeeSatisfaction {
+        target_id: Uuid,
+        amount: u32,
+    },
+    IncrementSalary {
+        target_id: Uuid,
+        amount: u32,
+    },
+    IncrementReputation {
+        amount: u32,
+    },
+    IncrementMoney {
+        amount: u32,
+    },
+    RemoveOrgVp {
+        target_id: Uuid,
+    },
+    AdvanceWeek,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum ServerEvent {
     None,
 
@@ -50,7 +82,7 @@ pub struct EmployeeSnapshot {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum PlayerAction {
     FireEmployee(Uuid),
-    GiveRaise(Uuid, i32),
+    GiveRaise(Uuid, u32),
     LaunchPRCampaign,
     DoNothing,
 }

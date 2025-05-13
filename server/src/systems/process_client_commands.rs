@@ -1,24 +1,22 @@
+use crate::InternalEventSender;
 use crate::systems::FanOutClientCommandReceiver;
-use crate::{NeedsAdvanceAWeek, NeedsWorldBroadcast};
-use bevy::prelude::{Mut, Query, Res, ResMut};
+use bevy::prelude::{Query, Res};
 use shared::{
-    ClientCommand, Employee, EmploymentStatus, Money, PlayerAction, Productivity, Reputation,
-    Salary, Satisfaction,
+    ClientCommand, Employee, EmploymentStatus, InternalEvent, Organization, PlayerAction,
+    Productivity, Salary, Satisfaction,
 };
 use tracing::info;
 
 pub fn process_client_commands(
     channel: Res<FanOutClientCommandReceiver>,
-    mut needs_broadcast: ResMut<NeedsWorldBroadcast>,
-    mut needs_advance_aweek: ResMut<NeedsAdvanceAWeek>,
-    mut employees: Query<(
+    internal_event_sender: Res<InternalEventSender>,
+    mut employee_query: Query<(
         &mut Employee,
         &mut Salary,
         &mut Satisfaction,
         &mut Productivity,
     )>,
-    mut money: Query<&mut Money>,
-    mut reputation: Query<&mut Reputation>,
+    mut organization_query: Query<&Organization>,
 ) {
     while let Ok((_, client_command)) = channel.rx_fan_out_client_commands.try_recv() {
         info!(
@@ -28,31 +26,74 @@ pub fn process_client_commands(
         match client_command {
             ClientCommand::PlayerAction(player_action) => match player_action {
                 PlayerAction::FireEmployee(target_id) => {
-                    let mut reputation = reputation.single_mut();
-                    for (mut employee, _salary, _, _) in employees.iter_mut() {
+                    for (employee, _, _, _) in employee_query.iter_mut() {
                         if employee.id == target_id {
-                            process_fire_employee(&mut employee, &mut reputation);
+                            info!("Firing employee: {}", employee.name);
+                            internal_event_sender
+                                .tx_internal_events
+                                .try_send(InternalEvent::SetEmployeeStatus {
+                                    target_id: employee.id,
+                                    status: EmploymentStatus::Fired,
+                                })
+                                .unwrap();
+
+                            internal_event_sender
+                                .tx_internal_events
+                                .try_send(InternalEvent::DecrementReputation { amount: 1 })
+                                .unwrap();
+
+                            for org in organization_query.iter_mut() {
+                                match org.vp {
+                                    None => {}
+                                    Some(org_vp_id) => {
+                                        if org_vp_id == employee.id {
+                                            internal_event_sender
+                                                .tx_internal_events
+                                                .try_send(InternalEvent::RemoveOrgVp {
+                                                    target_id: org.id,
+                                                })
+                                                .unwrap();
+                                        }
+                                    }
+                                }
+                            }
                             break;
                         }
                     }
                 }
 
                 PlayerAction::GiveRaise(target_id, raise_amount) => {
-                    for (employee, mut salary, mut satisfaction, _) in employees.iter_mut() {
+                    for (employee, _, _, _) in employee_query.iter_mut() {
                         if employee.id == target_id {
-                            process_give_raise(&mut satisfaction, &mut salary, raise_amount);
+                            internal_event_sender
+                                .tx_internal_events
+                                .try_send(InternalEvent::IncrementEmployeeSatisfaction {
+                                    target_id: employee.id,
+                                    amount: 1,
+                                })
+                                .unwrap();
+
+                            internal_event_sender
+                                .tx_internal_events
+                                .try_send(InternalEvent::IncrementSalary {
+                                    target_id: employee.id,
+                                    amount: raise_amount,
+                                })
+                                .unwrap();
                         }
                     }
                 }
 
                 PlayerAction::LaunchPRCampaign => {
-                    for mut rep in reputation.iter_mut() {
-                        rep.0 += 10;
-                    }
+                    internal_event_sender
+                        .tx_internal_events
+                        .try_send(InternalEvent::IncrementReputation { amount: 1 })
+                        .unwrap();
 
-                    for mut m in money.iter_mut() {
-                        m.0 -= 10000;
-                    }
+                    internal_event_sender
+                        .tx_internal_events
+                        .try_send(InternalEvent::DecrementMoney { amount: 1_000 })
+                        .unwrap();
                 }
 
                 PlayerAction::DoNothing => {
@@ -61,22 +102,35 @@ pub fn process_client_commands(
             },
         }
 
-        needs_broadcast.0 = true;
-        needs_advance_aweek.0 = true;
+        let total_productivity: u32 = employee_query
+            .iter()
+            .filter(|(emp, _, _, _)| emp.employment_status == EmploymentStatus::Active)
+            .map(|(_, _, sat, _)| sat.0 as u32)
+            .sum();
+
+        let total_expenses: u32 = employee_query
+            .iter()
+            .filter(|(emp, _, _, _)| emp.employment_status == EmploymentStatus::Active)
+            .map(|(_, sal, _, _)| sal.0 as u32 / 52)
+            .sum();
+
+        internal_event_sender
+            .tx_internal_events
+            .try_send(InternalEvent::IncrementMoney {
+                amount: total_productivity * 15,
+            })
+            .unwrap();
+
+        internal_event_sender
+            .tx_internal_events
+            .try_send(InternalEvent::DecrementMoney {
+                amount: total_expenses,
+            })
+            .unwrap();
+
+        internal_event_sender
+            .tx_internal_events
+            .try_send(InternalEvent::AdvanceWeek)
+            .unwrap();
     }
-}
-
-fn process_give_raise(
-    satisfaction: &mut Mut<Satisfaction>,
-    salary: &mut Mut<Salary>,
-    raise_amount: i32,
-) {
-    satisfaction.0 += 1;
-    salary.0 += raise_amount;
-}
-
-fn process_fire_employee(employee: &mut Mut<Employee>, reputation: &mut Mut<Reputation>) {
-    info!("Firing employee: {}", employee.name);
-    employee.employment_status = EmploymentStatus::Fired;
-    reputation.0 = reputation.0 - 1;
 }

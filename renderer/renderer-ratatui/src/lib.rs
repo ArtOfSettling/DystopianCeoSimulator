@@ -11,6 +11,7 @@ use renderer_api::{Renderer, RendererResource};
 use shared::{EmploymentStatus, GameStateSnapshot, PendingPlayerAction, PlayerAction};
 use std::io;
 use tracing::{debug, error, info};
+use uuid::Uuid;
 
 #[derive(Default)]
 pub struct RatatuiRendererPlugin {}
@@ -36,6 +37,7 @@ impl Plugin for RatatuiRendererPlugin {
 
 struct DisplayEntry<'a> {
     org_name: &'a str,
+    org_vp: &'a Option<Uuid>,
     employee: &'a shared::EmployeeSnapshot,
 }
 
@@ -45,6 +47,7 @@ fn flatten_organization_employees<'a>(snapshot: &'a GameStateSnapshot) -> Vec<Di
         for employee in &org.employees {
             result.push(DisplayEntry {
                 org_name: &org.name,
+                org_vp: &org.vp,
                 employee,
             });
         }
@@ -136,8 +139,14 @@ impl Renderer for RatatuiRenderer {
             for (i, entry) in flattened.iter().enumerate() {
                 if entry.org_name != current_org {
                     current_org = entry.org_name;
+                    let vp_name = entry.org_vp.and_then(|vp_id| {
+                        flattened
+                            .iter()
+                            .find(|emp| emp.employee.id == vp_id)
+                            .map(|emp| emp.employee.name.clone())
+                    });
                     lines.push(Line::from(Span::styled(
-                        format!("Org: {}", current_org),
+                        format!("Org: {}, VP: {:?}", current_org, vp_name),
                         Style::default()
                             .fg(Color::Cyan)
                             .add_modifier(Modifier::BOLD),

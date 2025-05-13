@@ -1,26 +1,20 @@
-use crate::systems::FanOutLogCommandReceiver;
-use crate::systems::setup_command_log::CommandLog;
+use crate::systems::{EventLog, FanOutLogEventReceiver};
 use bevy::prelude::ResMut;
 use serde::{Deserialize, Serialize};
-use shared::ClientCommand;
+use shared::InternalEvent;
 use std::io::Write;
-use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct LoggedCommand {
+pub struct LoggedEvent {
     pub timestamp_epoch_millis: u64,
-    pub client_id: Uuid,
-    pub command: ClientCommand,
+    pub event: InternalEvent,
 }
 
-pub fn process_log_commands(
-    mut log_file: ResMut<CommandLog>,
-    fan_out_log_command_receiver: ResMut<FanOutLogCommandReceiver>,
+pub fn process_event_log(
+    mut log_file: ResMut<EventLog>,
+    fan_out_log_event_receiver: ResMut<FanOutLogEventReceiver>,
 ) {
-    while let Ok(logged) = fan_out_log_command_receiver
-        .rx_fan_out_log_commands
-        .try_recv()
-    {
+    while let Ok(logged) = fan_out_log_event_receiver.rx_fan_out_log_events.try_recv() {
         match serde_json::to_string(&logged) {
             Ok(serialized) => {
                 if let Err(e) = writeln!(log_file.writer, "{}", serialized) {
