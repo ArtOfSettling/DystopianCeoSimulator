@@ -61,6 +61,8 @@ pub struct GameStateSnapshot {
     pub money: i32,
     pub reputation: i32,
     pub organizations: Vec<OrganizationSnapshot>,
+    pub pets: Vec<PetSnapshot>,
+    pub children: Vec<ChildSnapshot>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -81,7 +83,22 @@ pub struct EmployeeSnapshot {
     pub salary: i32,
     pub role: String,
     pub organization_id: Option<Uuid>,
+    pub children_ids: Vec<Uuid>,
+    pub pet_ids: Vec<Uuid>,
     pub org_role: Option<OrgRole>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ChildSnapshot {
+    pub id: Uuid,
+    pub name: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PetSnapshot {
+    pub id: Uuid,
+    pub name: String,
+    pub pet_type: PetType,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

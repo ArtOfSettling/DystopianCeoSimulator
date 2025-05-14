@@ -14,11 +14,73 @@ pub struct Reputation(pub i32);
 #[derive(Component, Clone, Debug, Serialize, Deserialize)]
 pub struct Week(pub u32);
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum PetType {
+    Cat(CatBreed),
+    Dog(DogBreed),
+    Horse(HorseBreed),
+    Lizard(LizardBreed),
+    Fish(FishBreed),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum CatBreed {
+    Tabby,
+    Siamese,
+    Persian,
+    MaineCoon,
+    Sphynx,
+    ScottishFold,
+    Bengal,
+    Ragdoll,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum DogBreed {
+    ShibaInu,
+    LabradorRetriever,
+    Poodle,
+    Bulldog,
+    GermanShepherd,
+    Dachshund,
+    GoldenRetriever,
+    Chihuahua,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum HorseBreed {
+    Appaloosa,
+    Arabian,
+    Clydesdale,
+    Thoroughbred,
+    Mustang,
+    ShetlandPony,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum LizardBreed {
+    BeardedDragon,
+    Gecko,
+    Iguana,
+    Chameleon,
+    Monitor,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum FishBreed {
+    GoldFish,
+    Guppy,
+    Betta,
+    Angelfish,
+    Tetra,
+    Clownfish,
+}
+
 #[derive(Component, Clone, Debug, Serialize, Deserialize)]
 pub struct Organization {
     pub id: Uuid,
     pub name: String,
-    pub vp: Option<Uuid>, // Employee ID
+    pub vp: Option<Uuid>,
 }
 
 #[derive(Component)]
@@ -27,6 +89,21 @@ pub struct Employee {
     pub name: String,
     pub role: String,
     pub employment_status: EmploymentStatus,
+}
+
+#[derive(Component)]
+pub struct Child {
+    pub id: Uuid,
+    pub name: String,
+    pub parent_id: Uuid,
+}
+
+#[derive(Component)]
+pub struct Pet {
+    pub id: Uuid,
+    pub name: String,
+    pub pet_type: PetType,
+    pub owner_id: Uuid,
 }
 
 #[derive(Component, Clone, Debug, Serialize, Deserialize)]

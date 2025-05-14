@@ -7,5 +7,7 @@ pub fn setup_world_state(mut commands: Commands) {
         money: 0,
         reputation: 0,
         organizations: vec![],
+        pets: vec![],
+        children: vec![],
     })
 }

@@ -1,7 +1,8 @@
 use bevy::prelude::Commands;
 use shared::{
-    Company, Employee, EmployeeFlag, EmployeeFlags, EmploymentStatus, Level, Money, OrgRole,
-    Organization, OrganizationMember, Player, Productivity, Reputation, Salary, Satisfaction, Week,
+    CatBreed, Child, Company, DogBreed, Employee, EmployeeFlag, EmployeeFlags, EmploymentStatus,
+    HorseBreed, Level, LizardBreed, Money, OrgRole, Organization, OrganizationMember, Pet, PetType,
+    Player, Productivity, Reputation, Salary, Satisfaction, Week,
 };
 use tracing::info;
 use uuid::Uuid;
@@ -27,9 +28,10 @@ pub fn setup_world_state(mut commands: Commands) {
     });
 
     info!("spawning vp of Red Division");
+    let alice_id = Uuid::from_u128(101);
     commands.spawn((
         Employee {
-            id: Uuid::from_u128(101),
+            id: alice_id,
             name: "Alice".into(),
             role: "VP of Red".into(),
             employment_status: EmploymentStatus::Active,
@@ -44,6 +46,20 @@ pub fn setup_world_state(mut commands: Commands) {
         Salary(12_000),
         EmployeeFlags(vec![EmployeeFlag::Loyal]),
     ));
+
+    info!("spawning vp of Red Division (children and pets)");
+    commands.spawn(Child {
+        id: Uuid::from_u128(1001),
+        name: "Little Al".into(),
+        parent_id: alice_id,
+    });
+
+    commands.spawn(Pet {
+        id: Uuid::from_u128(1002),
+        name: "Mittens".into(),
+        pet_type: PetType::Cat(CatBreed::Siamese),
+        owner_id: alice_id,
+    });
 
     info!("spawning employees of Red Division");
     commands.spawn((
@@ -83,6 +99,7 @@ pub fn setup_world_state(mut commands: Commands) {
     ));
 
     info!("spawning vp of Blue Division");
+    let diana_id = Uuid::from_u128(201);
     commands.spawn((
         Employee {
             id: Uuid::from_u128(201),
@@ -100,6 +117,28 @@ pub fn setup_world_state(mut commands: Commands) {
         Salary(13_000),
         EmployeeFlags(vec![]),
     ));
+
+    info!("spawning Diana's pet");
+    commands.spawn(Pet {
+        id: Uuid::from_u128(2001),
+        name: "Doge".into(),
+        pet_type: PetType::Dog(DogBreed::ShibaInu),
+        owner_id: diana_id,
+    });
+
+    commands.spawn(Pet {
+        id: Uuid::from_u128(2002),
+        name: "Horsy".into(),
+        pet_type: PetType::Horse(HorseBreed::Arabian),
+        owner_id: diana_id,
+    });
+
+    commands.spawn(Pet {
+        id: Uuid::from_u128(2003),
+        name: "Horse Face".into(),
+        pet_type: PetType::Horse(HorseBreed::Clydesdale),
+        owner_id: diana_id,
+    });
 
     info!("spawning employees of Blue Division");
     commands.spawn((
@@ -120,9 +159,10 @@ pub fn setup_world_state(mut commands: Commands) {
         EmployeeFlags(vec![]),
     ));
 
+    let faye_id = Uuid::from_u128(203);
     commands.spawn((
         Employee {
-            id: Uuid::from_u128(203),
+            id: faye_id,
             name: "Faye".into(),
             role: "Marketing".into(),
             employment_status: EmploymentStatus::Active,
@@ -137,6 +177,13 @@ pub fn setup_world_state(mut commands: Commands) {
         Salary(7_000),
         EmployeeFlags(vec![EmployeeFlag::BurnedOut]),
     ));
+
+    commands.spawn(Pet {
+        id: Uuid::from_u128(2004),
+        name: "Beardy".into(),
+        pet_type: PetType::Lizard(LizardBreed::BeardedDragon),
+        owner_id: faye_id,
+    });
 
     info!("spawning Company");
     commands.insert_resource(Company {

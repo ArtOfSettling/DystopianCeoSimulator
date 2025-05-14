@@ -1,18 +1,18 @@
 use crate::internal_commands::InternalCommand;
-use crate::internal_commands::InternalCommand::{PlayerConnected, PlayerDisconnected};
+use crate::internal_commands::InternalCommand::PlayerConnected;
 use async_channel::{Receiver, Sender, bounded};
 use async_std::io::ReadExt;
 use async_std::net::{TcpListener, TcpStream};
 use async_std::task::sleep;
 use bevy::prelude::{Commands, Resource};
 use bevy::tasks::IoTaskPool;
-use bevy::tasks::futures_lite::AsyncWriteExt;
 use bincode;
-use futures::FutureExt;
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use futures::{AsyncWriteExt, FutureExt};
 use shared::components::InternalEntity;
 use shared::{ClientCommand, ServerEvent};
 use std::time::Duration;
-use tracing::{error, info, instrument, warn};
+use tracing::{error, info, instrument};
 use uuid::Uuid;
 
 const TARGET_SERVER_TICK: u64 = 32;
@@ -98,15 +98,23 @@ async fn handle_client(
     tx_internal_server_commands: Sender<InternalCommand>,
     rx_server_commands: Receiver<ServerEvent>,
 ) {
-    let mut buf = vec![0; 1024];
+    let mut length_buf = [0; 4];
 
     loop {
         futures::select! {
             maybe_server_command = rx_server_commands.recv().fuse() => {
                 match maybe_server_command {
                     Ok(server_command) => {
+                        let mut message = Vec::new();
                         let serialized = bincode::serialize(&server_command).unwrap();
-                        if let Err(e) = stream.write_all(&serialized).await {
+                        // first write the buffer size
+                        let length = serialized.len() as u32;
+                        message.write_u32::<BigEndian>(length).unwrap();
+                        // append the actual payload
+                        message.extend_from_slice(&serialized);
+
+                        // then write the buffer
+                        if let Err(e) = stream.write_all(&message).await {
                             error!("Failed to send broadcast to client: {:?}", e);
                         }
                     }
@@ -114,22 +122,26 @@ async fn handle_client(
                 }
             },
 
-            maybe_stream_buff = stream.read(&mut buf).fuse() => {
-                match maybe_stream_buff {
-                    Ok(n) if n > 0 => {
-                        let command: ClientCommand = bincode::deserialize(&buf[..n]).unwrap();
-                        info!("Received command from client: {:?}", command);
-                        tx_client_commands.send((uuid, command)).await.expect("Failed to forward command");
-                    }
+            maybe_length_buf = stream.read_exact(&mut length_buf).fuse() => {
+                match maybe_length_buf {
                     Ok(_) => {
-                        warn!("Client closed the connection");
+                        // first read the buffer size
+                        let length = (&length_buf[..]).read_u32::<BigEndian>().unwrap() as usize;
 
-                        tx_internal_server_commands
-                            .send(PlayerDisconnected(InternalEntity::new(uuid)))
-                            .await
-                            .unwrap();
+                        // then read the buffer
+                        let mut msg_buf = vec![0; length];
+                        stream.read_exact(&mut msg_buf).await.unwrap();
 
-                        break;
+                        let client_command: ClientCommand = match bincode::deserialize(&msg_buf) {
+                            Ok(msg) => msg,
+                            Err(e) => {
+                                error!("Deserialization failed: {}", e);
+                                panic!("Deserialization failed: {}", e);
+                            }
+                        };
+
+                        info!("Received command from client: {:?}", client_command);
+                        tx_client_commands.send((uuid, client_command)).await.expect("Failed to forward command");
                     }
                     Err(e) => {
                         error!("Error reading from server: {:?}", e);

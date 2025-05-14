@@ -12,7 +12,10 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders};
 use ratatui::{Terminal, backend::CrosstermBackend, widgets::Paragraph};
 use renderer_api::{Renderer, RendererResource};
-use shared::{GameStateSnapshot, PendingPlayerAction, PlayerAction};
+use shared::{
+    ChildSnapshot, GameStateSnapshot, OrganizationSnapshot, PendingPlayerAction, PetSnapshot,
+    PlayerAction,
+};
 use std::io;
 use tracing::{debug, error};
 
@@ -45,6 +48,26 @@ impl Plugin for RatatuiRendererPlugin {
         app.insert_resource(RendererResource::new(Box::new(renderer)))
             .add_systems(Update, render_system);
     }
+}
+
+fn total_selectable_items(
+    org: &OrganizationSnapshot,
+    child_snapshots: &[ChildSnapshot],
+    pet_snapshots: &[PetSnapshot],
+) -> usize {
+    let mut total = 0;
+    for emp in &org.employees {
+        total += 1; // the employee
+        total += child_snapshots
+            .iter()
+            .filter(|child| emp.children_ids.contains(&child.id))
+            .count();
+        total += pet_snapshots
+            .iter()
+            .filter(|pet| emp.pet_ids.contains(&pet.id))
+            .count();
+    }
+    total
 }
 
 impl Renderer for RatatuiRenderer {
@@ -88,11 +111,11 @@ impl Renderer for RatatuiRenderer {
                     PlayerInputAction::MenuSelect => {}
                     PlayerInputAction::MenuUp => {
                         if self.selected_index == 0 {
-                            self.selected_index = game_state_snapshot.organizations
-                                [self.selected_organization]
-                                .employees
-                                .len()
-                                - 1;
+                            self.selected_index = total_selectable_items(
+                                &game_state_snapshot.organizations[self.selected_organization],
+                                &game_state_snapshot.children,
+                                &game_state_snapshot.pets,
+                            ) - 1;
                         } else {
                             self.selected_index -= 1;
                         }
@@ -100,9 +123,11 @@ impl Renderer for RatatuiRenderer {
                     PlayerInputAction::MenuDown => {
                         self.selected_index += 1;
                         if self.selected_index
-                            >= game_state_snapshot.organizations[self.selected_organization]
-                                .employees
-                                .len()
+                            >= total_selectable_items(
+                                &game_state_snapshot.organizations[self.selected_organization],
+                                &game_state_snapshot.children,
+                                &game_state_snapshot.pets,
+                            )
                         {
                             self.selected_index = 0;
                         }
@@ -180,6 +205,8 @@ impl Renderer for RatatuiRenderer {
                         frame,
                         main_chunks[0],
                         &game_state_snapshot.organizations[self.selected_organization],
+                        &game_state_snapshot.pets,
+                        &game_state_snapshot.children,
                         self.selected_index,
                     );
                 }

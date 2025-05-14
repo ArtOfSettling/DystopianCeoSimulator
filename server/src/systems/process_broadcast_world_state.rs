@@ -2,9 +2,9 @@ use crate::NeedsWorldBroadcast;
 use crate::systems::ServerEventSender;
 use bevy::prelude::{Query, Res, ResMut};
 use shared::{
-    Employee, EmployeeSnapshot, GameStateSnapshot, InternalEntity, Level, Money, Organization,
-    OrganizationMember, OrganizationSnapshot, Player, Reputation, Salary, Satisfaction,
-    ServerEvent, Week,
+    Child, ChildSnapshot, Employee, EmployeeSnapshot, GameStateSnapshot, InternalEntity, Level,
+    Money, Organization, OrganizationMember, OrganizationSnapshot, Pet, PetSnapshot, Player,
+    Reputation, Salary, Satisfaction, ServerEvent, Week,
 };
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -22,6 +22,8 @@ pub fn process_broadcast_world_state(
         &Satisfaction,
         &Level,
     )>,
+    query_pet: Query<&Pet>,
+    query_child: Query<&Child>,
     server_event_sender: Res<ServerEventSender>,
 ) {
     // Only send if there's a connected player and we're due to broadcast
@@ -47,6 +49,16 @@ pub fn process_broadcast_world_state(
             level: lvl.0,
             organization_id: Some(org_member.organization_id.clone()),
             org_role: Some(org_member.role.clone()),
+            children_ids: query_child
+                .iter()
+                .filter(|child| child.parent_id == emp.id)
+                .map(|child| child.id)
+                .collect(),
+            pet_ids: query_pet
+                .iter()
+                .filter(|pet| pet.owner_id == emp.id)
+                .map(|pet| pet.id)
+                .collect(),
         };
 
         org_map
@@ -65,11 +77,30 @@ pub fn process_broadcast_world_state(
         })
         .collect::<Vec<_>>();
 
+    let pets = query_pet
+        .iter()
+        .map(|pet| PetSnapshot {
+            id: pet.id,
+            name: pet.name.clone(),
+            pet_type: pet.pet_type.clone(),
+        })
+        .collect::<Vec<_>>();
+
+    let children = query_child
+        .iter()
+        .map(|child| ChildSnapshot {
+            id: child.id,
+            name: child.name.clone(),
+        })
+        .collect::<Vec<_>>();
+
     let snapshot = GameStateSnapshot {
         week: week.0,
         money,
         reputation,
         organizations,
+        pets,
+        children,
     };
 
     let _ = server_event_sender

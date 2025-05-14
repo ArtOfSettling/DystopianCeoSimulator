@@ -2,12 +2,14 @@ use ratatui::{
     prelude::*,
     widgets::{Block, Borders, List, ListItem, ListState},
 };
-use shared::OrganizationSnapshot;
+use shared::{ChildSnapshot, OrganizationSnapshot, PetSnapshot};
 
 pub fn draw_detailed_org_view(
     f: &mut Frame,
     area: Rect,
     organization_snapshot: &OrganizationSnapshot,
+    pet_snapshots: &Vec<PetSnapshot>,
+    child_snapshots: &Vec<ChildSnapshot>,
     selected_index: usize,
 ) {
     let mut all_items: Vec<ListItem> = Vec::new();
@@ -32,6 +34,29 @@ pub fn draw_detailed_org_view(
             );
             all_items.push(ListItem::new(vp_line.clone()));
             selectable_items.push(ListItem::new(vp_line)); // Add VP as selectable
+
+            // Add children
+            for child in child_snapshots
+                .iter()
+                .filter(|child| vp.children_ids.contains(&child.id))
+            {
+                let child_line = format!(
+                    "      └── Child: {} (Age {})",
+                    child.name, "not modelled yet"
+                );
+                all_items.push(ListItem::new(child_line.clone()));
+                selectable_items.push(ListItem::new(child_line));
+            }
+
+            // Add pets
+            for pet in pet_snapshots
+                .iter()
+                .filter(|pet| vp.pet_ids.contains(&pet.id))
+            {
+                let pet_line = format!("      └── Pet: {} ({:?})", pet.name, pet.pet_type);
+                all_items.push(ListItem::new(pet_line.clone()));
+                selectable_items.push(ListItem::new(pet_line));
+            }
         } else {
             let line = "VP: [Unknown]".to_string();
             all_items.push(ListItem::new(line));
@@ -56,6 +81,29 @@ pub fn draw_detailed_org_view(
         );
         all_items.push(ListItem::new(emp_line.clone()));
         selectable_items.push(ListItem::new(emp_line));
+
+        // Add children
+        for child in child_snapshots
+            .iter()
+            .filter(|child| emp.children_ids.contains(&child.id))
+        {
+            let child_line = format!(
+                "      └── Child: {} (Age {})",
+                child.name, "not modelled yet"
+            );
+            all_items.push(ListItem::new(child_line.clone()));
+            selectable_items.push(ListItem::new(child_line));
+        }
+
+        // Add pets
+        for pet in pet_snapshots
+            .iter()
+            .filter(|pet| emp.pet_ids.contains(&pet.id))
+        {
+            let pet_line = format!("      └── Pet: {} ({:?})", pet.name, pet.pet_type);
+            all_items.push(ListItem::new(pet_line.clone()));
+            selectable_items.push(ListItem::new(pet_line));
+        }
     }
 
     // Highlight just within the selectable entries
