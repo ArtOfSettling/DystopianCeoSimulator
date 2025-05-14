@@ -4,7 +4,7 @@ use ratatui::{
     style::{Modifier, Style},
     widgets::{Block, Borders, Cell, Row, Table},
 };
-use shared::GameStateSnapshot;
+use shared::{EmploymentStatus, GameStateSnapshot};
 
 pub fn draw_org_view(
     f: &mut Frame,
@@ -46,6 +46,7 @@ pub fn draw_org_view(
             let total_salary: i32 = org
                 .employees
                 .iter()
+                .filter(|e| e.employment_status == EmploymentStatus::Active)
                 .filter_map(|emp| {
                     org.employees
                         .iter()
