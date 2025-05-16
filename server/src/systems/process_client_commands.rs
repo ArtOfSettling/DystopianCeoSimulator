@@ -1,6 +1,6 @@
-use crate::InternalEventSender;
 use crate::systems::FanOutClientCommandReceiver;
-use bevy::prelude::{Query, Res, With, Without};
+use crate::{InternalEventSender, NeedsStateUpdate};
+use bevy::prelude::{Query, Res, ResMut, With, Without};
 use shared::{
     ClientCommand, Employed, InternalEntity, InternalEvent, Name, PlayerAction, Salary,
     Satisfaction,
@@ -9,11 +9,13 @@ use tracing::info;
 
 pub fn process_client_commands(
     channel: Res<FanOutClientCommandReceiver>,
+    mut needs_state_update: ResMut<NeedsStateUpdate>,
     internal_event_sender: Res<InternalEventSender>,
     employee_query: Query<(&InternalEntity, &Name, &Salary, &Satisfaction), With<Employed>>,
     entity_query: Query<(&InternalEntity, &Name), Without<Employed>>,
 ) {
     while let Ok((_, client_command)) = channel.rx_fan_out_client_commands.try_recv() {
+        needs_state_update.0 = true;
         info!(
             "Server has clients command for processing {:?}",
             client_command

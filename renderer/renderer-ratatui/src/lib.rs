@@ -180,16 +180,23 @@ impl Renderer for RatatuiRenderer {
         }
 
         match self.terminal.draw(|frame| {
+            let outer_chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Min(0), Constraint::Length(3)])
+                .split(frame.area());
+
+            let main_area = outer_chunks[0];
+            let footer_area = outer_chunks[1];
+
             let chunks = Layout::default()
                 .direction(Direction::Horizontal)
-                .constraints([
-                    Constraint::Percentage(30), // Left pane
-                    Constraint::Percentage(70), // Right pane
-                ])
-                .split(frame.area());
+                .constraints([Constraint::Percentage(30), Constraint::Percentage(70)])
+                .split(main_area);
 
             let left_pane = chunks[0];
             let right_pane = chunks[1];
+
+            draw_financial_summary(frame, footer_area, &game_state_snapshot);
 
             match &self.current_page {
                 AppPage::OrgList { selected_index } => {
@@ -262,6 +269,33 @@ impl Renderer for RatatuiRenderer {
     }
 }
 
+fn draw_financial_summary(frame: &mut Frame, rect: Rect, game_state_snapshot: &GameStateSnapshot) {
+    let lines = vec![
+        format!("Week: {}", game_state_snapshot.week),
+        format!("Cash: ${}", game_state_snapshot.financials.actual_cash),
+        format!(
+            "Income: ${}",
+            game_state_snapshot.financials.this_weeks_income
+        ),
+        format!(
+            "Expenses: ${}",
+            game_state_snapshot.financials.this_weeks_expenses
+        ),
+        format!(
+            "Net Profit: ${}",
+            game_state_snapshot.financials.this_weeks_net_profit
+        ),
+    ];
+
+    let block = Block::default().title("Financials").borders(Borders::ALL);
+
+    let paragraph = Paragraph::new(lines.join(" | "))
+        .block(block)
+        .wrap(Wrap { trim: true });
+
+    frame.render_widget(paragraph, rect);
+}
+
 fn draw_org_list(
     frame: &mut Frame,
     rect: Rect,
@@ -309,6 +343,13 @@ fn draw_org_summary(frame: &mut Frame, rect: Rect, org_snapshot: &OrganizationSn
             })
         ),
         format!("Employees: {}", org_snapshot.employees.len()),
+        format!("Cash: ${}", org_snapshot.financials.actual_cash),
+        format!("Income: ${}", org_snapshot.financials.this_weeks_income),
+        format!("Expenses: ${}", org_snapshot.financials.this_weeks_expenses),
+        format!(
+            "Net Profit: ${}",
+            org_snapshot.financials.this_weeks_net_profit
+        ),
     ];
 
     let block = Block::default()

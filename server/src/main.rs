@@ -21,6 +21,9 @@ use tracing_appender::non_blocking::WorkerGuard;
 #[derive(Default, Resource)]
 pub struct NeedsWorldBroadcast(pub bool);
 
+#[derive(Default, Resource)]
+pub struct NeedsStateUpdate(pub bool);
+
 #[derive(Resource)]
 pub struct InternalEventSender {
     pub(crate) tx_internal_events: Sender<InternalEvent>,
@@ -44,6 +47,7 @@ fn main() -> anyhow::Result<()> {
         .add_plugins(MinimalPlugins.set(ScheduleRunnerPlugin::run_loop(Duration::from_millis(10))))
         .insert_resource(Time::<Fixed>::from_hz(128.0))
         .insert_resource(NeedsWorldBroadcast::default())
+        .insert_resource(NeedsStateUpdate::default())
         .insert_resource(InternalEventSender { tx_internal_events })
         .insert_resource(InternalEventReceiver { rx_internal_events })
         .add_systems(Startup, build_setup_chain(&cli))
@@ -56,13 +60,18 @@ fn main() -> anyhow::Result<()> {
                 process_command_log,
                 // Core gameplay loop
                 process_client_commands,
+                process_organization_updates,
+                process_company_updates,
+                // clear any state update flags
+                process_clear_needs_state_update,
                 // Fan out just prior to broadcasting, so we have the opportunity to save.
                 process_fan_out_events,
                 process_internal_events,
                 process_event_log,
                 // Broadcast the new state now that everything is done.
                 process_broadcast_world_state,
-            ),
+            )
+                .chain(),
         )
         .run();
 
@@ -110,6 +119,9 @@ fn setup_logging() -> WorkerGuard {
     guard
 }
 
+use crate::systems::process_clear_needs_state_update::process_clear_needs_state_update;
+use crate::systems::process_company_updates::process_company_updates;
+use crate::systems::process_organization_updates::process_organization_updates;
 use async_channel::{Receiver, Sender, unbounded};
 use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;

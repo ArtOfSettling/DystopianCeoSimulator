@@ -1,10 +1,11 @@
+use crate::Financials;
 use bevy::prelude::Resource;
 use uuid::Uuid;
 
 #[derive(Resource)]
 pub struct Company {
-    pub revenue: i64,
     pub public_opinion: i32,
+    pub financials: Financials,
 }
 
 #[derive(Resource, Default, Debug)]

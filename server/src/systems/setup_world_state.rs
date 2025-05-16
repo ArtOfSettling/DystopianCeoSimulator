@@ -1,8 +1,8 @@
 use bevy::prelude::Commands;
 use shared::{
-    CatBreed, Company, DogBreed, Employed, EmployeeFlag, EmployeeFlags, EntityType, HorseBreed,
-    InternalEntity, Level, LizardBreed, Money, Name, OrgRole, Organization, Owner, Player,
-    Productivity, Reputation, Salary, Satisfaction, Type, Week, WeekOfBirth,
+    CatBreed, Company, DogBreed, Employed, EmployeeFlag, EmployeeFlags, EntityType, Financials,
+    HorseBreed, InternalEntity, Level, LizardBreed, Money, Name, OrgRole, Organization, Owner,
+    Player, Productivity, Reputation, Salary, Satisfaction, Type, Week, WeekOfBirth,
 };
 use tracing::info;
 use uuid::Uuid;
@@ -21,12 +21,24 @@ pub fn setup_world_state(mut commands: Commands) {
         id: org1_id,
         name: "Red Division".into(),
         vp: Some(Uuid::from_u128(101)),
+        financials: Financials {
+            this_weeks_income: 0,
+            this_weeks_expenses: 0,
+            this_weeks_net_profit: 0,
+            actual_cash: 256_227,
+        },
     });
 
     commands.spawn(Organization {
         id: org2_id,
         name: "Blue Division".into(),
         vp: Some(Uuid::from_u128(201)),
+        financials: Financials {
+            this_weeks_income: 0,
+            this_weeks_expenses: 0,
+            this_weeks_net_profit: 0,
+            actual_cash: 709_991,
+        },
     });
 
     info!("spawning vp of Red Division");
@@ -216,7 +228,12 @@ pub fn setup_world_state(mut commands: Commands) {
 
     info!("spawning Company");
     commands.insert_resource(Company {
-        revenue: 0,
         public_opinion: 50,
+        financials: Financials {
+            this_weeks_income: 0,
+            this_weeks_expenses: 0,
+            this_weeks_net_profit: 0,
+            actual_cash: 1_102_101,
+        },
     });
 }

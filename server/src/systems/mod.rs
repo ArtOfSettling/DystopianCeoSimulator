@@ -1,11 +1,14 @@
 mod process_broadcast_world_state;
+pub(crate) mod process_clear_needs_state_update;
 mod process_client_commands;
 mod process_command_log;
+pub(crate) mod process_company_updates;
 mod process_event_log;
 mod process_fan_out_commands;
 mod process_fan_out_events;
 mod process_internal_commands;
 mod process_internal_events;
+pub(crate) mod process_organization_updates;
 mod setup_command_log;
 mod setup_connection_resources;
 mod setup_event_log;

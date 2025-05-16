@@ -48,6 +48,13 @@ pub enum InternalEvent {
         organization_id: Uuid,
         employee_id: Uuid,
     },
+    SetOrgFinancials {
+        organization_id: Uuid,
+        financials: Financials,
+    },
+    SetCompanyFinancials {
+        financials: Financials,
+    },
     AdvanceWeek,
 }
 
@@ -67,8 +74,8 @@ pub enum UnemployedSnapshot {
 #[derive(Resource, Clone, Debug, Serialize, Deserialize)]
 pub struct GameStateSnapshot {
     pub week: u32,
-    pub money: i32,
     pub reputation: i32,
+    pub financials: Financials,
     pub organizations: Vec<OrganizationSnapshot>,
     pub humans: Vec<HumanSnapshot>,
     pub pets: Vec<AnimalSnapshot>,
@@ -81,6 +88,7 @@ pub struct OrganizationSnapshot {
     pub name: String,
     pub vp: Option<Uuid>,
     pub employees: Vec<EmployeeSnapshot>,
+    pub financials: Financials,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

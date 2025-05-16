@@ -4,8 +4,8 @@ use bevy::ecs::system::SystemState;
 use bevy::prelude::{Entity, QueryState, Res, ResMut, Without, World};
 use shared::components::InternalEntity;
 use shared::{
-    Employed, EmployeeFlags, InternalEvent, Level, Money, Name, OrgRole, Organization, Player,
-    Productivity, Reputation, Salary, Satisfaction, Week,
+    Company, Employed, EmployeeFlags, InternalEvent, Level, Money, Name, OrgRole, Organization,
+    Player, Productivity, Reputation, Salary, Satisfaction, Week,
 };
 use tracing::info;
 
@@ -29,9 +29,13 @@ pub fn process_internal_events(
     )>,
     entity_query: &mut QueryState<(Entity, &mut InternalEntity), Without<Employed>>,
     organizations: &mut QueryState<&mut Organization>,
-    params: &mut SystemState<(ResMut<NeedsWorldBroadcast>, Res<FanOutEventReceiver>)>,
+    params: &mut SystemState<(
+        ResMut<Company>,
+        ResMut<NeedsWorldBroadcast>,
+        Res<FanOutEventReceiver>,
+    )>,
 ) {
-    let (mut needs_world_broadcast, fan_out_event_receiver) = params.get_mut(world);
+    let (mut company, mut needs_world_broadcast, fan_out_event_receiver) = params.get_mut(world);
 
     if let Ok(internal_event) = fan_out_event_receiver.rx_fan_out_events.try_recv() {
         info!(
@@ -41,11 +45,9 @@ pub fn process_internal_events(
         needs_world_broadcast.0 = true;
 
         match internal_event {
-            InternalEvent::RemoveEmployedStatus {
-                employee_id: target_id,
-            } => {
+            InternalEvent::RemoveEmployedStatus { employee_id } => {
                 for (entity, internal_entity, _, _, _, _) in employee_query.iter_mut(world) {
-                    if internal_entity.id == target_id {
+                    if internal_entity.id == employee_id {
                         world.entity_mut(entity).remove::<Employed>();
                         break;
                     }
@@ -94,11 +96,11 @@ pub fn process_internal_events(
             }
 
             InternalEvent::IncrementEmployeeSatisfaction {
-                employee_id: target_id,
+                employee_id,
                 amount,
             } => {
                 for (_, internal_entity, _, _, _, mut sat) in employee_query.iter_mut(world) {
-                    if internal_entity.id == target_id {
+                    if internal_entity.id == employee_id {
                         sat.0 += amount as i32;
                         break;
                     }
@@ -106,11 +108,11 @@ pub fn process_internal_events(
             }
 
             InternalEvent::IncrementSalary {
-                employee_id: target_id,
+                employee_id,
                 amount,
             } => {
                 for (_, internal_entity, _, _, mut salary, _) in employee_query.iter_mut(world) {
-                    if internal_entity.id == target_id {
+                    if internal_entity.id == employee_id {
                         salary.0 += amount as i32;
                         break;
                     }
@@ -123,11 +125,9 @@ pub fn process_internal_events(
                 }
             }
 
-            InternalEvent::RemoveOrgVp {
-                organization_id: target_id,
-            } => {
+            InternalEvent::RemoveOrgVp { organization_id } => {
                 for mut org in organizations.iter_mut(world) {
-                    if org.id == target_id {
+                    if org.id == organization_id {
                         org.vp = None;
                     }
                 }
@@ -139,13 +139,13 @@ pub fn process_internal_events(
             }
 
             InternalEvent::SetOrgVp {
-                organization_id: target_id,
+                organization_id,
                 employee_id,
             } => {
                 // Replace the existing vp
                 let mut vp_to_remove = None;
                 for mut org in organizations.iter_mut(world) {
-                    if org.id == target_id {
+                    if org.id == organization_id {
                         vp_to_remove = org.vp;
                         org.vp = Some(employee_id);
                         break;
@@ -169,6 +169,22 @@ pub fn process_internal_events(
                         continue;
                     }
                 }
+            }
+
+            InternalEvent::SetOrgFinancials {
+                organization_id,
+                financials,
+            } => {
+                for mut org in organizations.iter_mut(world) {
+                    if org.id == organization_id {
+                        org.financials = financials.clone();
+                        break;
+                    }
+                }
+            }
+
+            InternalEvent::SetCompanyFinancials { financials } => {
+                company.financials = financials.clone();
             }
         }
     }

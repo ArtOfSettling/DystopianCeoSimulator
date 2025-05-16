@@ -2,16 +2,17 @@ use crate::NeedsWorldBroadcast;
 use crate::systems::ServerEventSender;
 use bevy::prelude::{Query, Res, ResMut, Without};
 use shared::{
-    AnimalSnapshot, Employed, EmployeeSnapshot, EntityType, GameStateSnapshot, HumanSnapshot,
-    InternalEntity, Level, Money, Name, Organization, OrganizationSnapshot, Owner, Player,
-    Reputation, Salary, Satisfaction, ServerEvent, Type, UnemployedSnapshot, Week, WeekOfBirth,
+    AnimalSnapshot, Company, Employed, EmployeeSnapshot, EntityType, GameStateSnapshot,
+    HumanSnapshot, InternalEntity, Level, Money, Name, Organization, OrganizationSnapshot, Owner,
+    Player, Reputation, Salary, Satisfaction, ServerEvent, Type, UnemployedSnapshot, Week,
+    WeekOfBirth,
 };
 use std::collections::HashMap;
 use uuid::Uuid;
 
 pub fn process_broadcast_world_state(
     mut needs_broadcast: ResMut<NeedsWorldBroadcast>,
-    query_money: Query<&Money>,
+    company: Res<Company>,
     query_rep: Query<&Reputation>,
     query_player: Query<(&Player, &Money, &Reputation, &Week, Option<&InternalEntity>)>,
     query_organizations: Query<&Organization>,
@@ -39,7 +40,6 @@ pub fn process_broadcast_world_state(
     }
     needs_broadcast.0 = false;
 
-    let money = query_money.single().0;
     let reputation = query_rep.single().0;
 
     let mut org_map: HashMap<Uuid, Vec<EmployeeSnapshot>> = HashMap::new();
@@ -90,6 +90,7 @@ pub fn process_broadcast_world_state(
             name: org.name.clone(),
             vp: org.vp,
             employees: org_map.remove(&org.id).unwrap_or_default(),
+            financials: org.financials.clone(),
         })
         .collect::<Vec<_>>();
 
@@ -139,7 +140,7 @@ pub fn process_broadcast_world_state(
 
     let snapshot = GameStateSnapshot {
         week: week.0,
-        money,
+        financials: company.financials.clone(),
         reputation,
         organizations,
         humans,
