@@ -1,14 +1,17 @@
 use crate::NeedsWorldBroadcast;
 use crate::systems::FanOutEventReceiver;
-use bevy::prelude::{Entity, Query, Res, ResMut};
-use shared::components::{Employee, InternalEntity};
-use shared::{InternalEvent, Money, Organization, Player, Reputation, Salary, Satisfaction, Week};
+use bevy::ecs::system::SystemState;
+use bevy::prelude::{Entity, QueryState, Res, ResMut, Without, World};
+use shared::components::InternalEntity;
+use shared::{
+    Employed, EmployeeFlags, InternalEvent, Level, Money, Name, OrgRole, Organization, Player,
+    Productivity, Reputation, Salary, Satisfaction, Week,
+};
 use tracing::info;
 
 pub fn process_internal_events(
-    mut needs_broadcast: ResMut<NeedsWorldBroadcast>,
-    channel: Res<FanOutEventReceiver>,
-    mut player_query: Query<(
+    world: &mut World,
+    player_query: &mut QueryState<(
         Entity,
         &Player,
         &mut Money,
@@ -16,55 +19,98 @@ pub fn process_internal_events(
         &mut Week,
         Option<&InternalEntity>,
     )>,
-    mut employee_query: Query<(&mut Employee, &mut Salary, &mut Satisfaction)>,
-    mut organizations: Query<&mut Organization>,
+    employee_query: &mut QueryState<(
+        Entity,
+        &mut InternalEntity,
+        &mut Name,
+        &mut Employed,
+        &mut Salary,
+        &mut Satisfaction,
+    )>,
+    entity_query: &mut QueryState<(Entity, &mut InternalEntity), Without<Employed>>,
+    organizations: &mut QueryState<&mut Organization>,
+    params: &mut SystemState<(ResMut<NeedsWorldBroadcast>, Res<FanOutEventReceiver>)>,
 ) {
-    while let Ok(internal_event) = channel.rx_fan_out_events.try_recv() {
+    let (mut needs_world_broadcast, fan_out_event_receiver) = params.get_mut(world);
+
+    if let Ok(internal_event) = fan_out_event_receiver.rx_fan_out_events.try_recv() {
         info!(
             "Server has internal event for processing {:?}",
             internal_event
         );
-        needs_broadcast.0 = true;
+        needs_world_broadcast.0 = true;
 
         match internal_event {
-            InternalEvent::SetEmployeeStatus { target_id, status } => {
-                for (mut emp, _, _) in employee_query.iter_mut() {
-                    if emp.id == target_id {
-                        emp.employment_status = status;
+            InternalEvent::RemoveEmployedStatus {
+                employee_id: target_id,
+            } => {
+                for (entity, internal_entity, _, _, _, _) in employee_query.iter_mut(world) {
+                    if internal_entity.id == target_id {
+                        world.entity_mut(entity).remove::<Employed>();
+                        break;
+                    }
+                }
+            }
+
+            InternalEvent::AddEmployedStatus {
+                organization_id,
+                employee_id,
+            } => {
+                for (entity, internal_entity) in entity_query.iter_mut(world) {
+                    if internal_entity.id == employee_id {
+                        world.entity_mut(entity).insert(Employed {
+                            owner_id: organization_id,
+                            role: OrgRole::Employee,
+                        });
+
+                        world.entity_mut(entity).insert_if_new((
+                            Level(10_000),
+                            Satisfaction(80),
+                            Productivity(80),
+                            Salary(7_000),
+                            EmployeeFlags(vec![]),
+                        ));
+
                         break;
                     }
                 }
             }
 
             InternalEvent::DecrementReputation { amount } => {
-                for (_, _, _, mut rep, _, _) in player_query.iter_mut() {
+                for (_, _, _, mut rep, _, _) in player_query.iter_mut(world) {
                     rep.0 -= amount as i32;
                 }
             }
 
             InternalEvent::DecrementMoney { amount } => {
-                for (_, _, mut money, _, _, _) in player_query.iter_mut() {
+                for (_, _, mut money, _, _, _) in player_query.iter_mut(world) {
                     money.0 -= amount as i32;
                 }
             }
 
             InternalEvent::IncrementMoney { amount } => {
-                let (_, _, mut money, _, _, _) = player_query.single_mut();
+                let (_, _, mut money, _, _, _) = player_query.single_mut(world);
                 money.0 += amount as i32;
             }
 
-            InternalEvent::IncrementEmployeeSatisfaction { target_id, amount } => {
-                for (emp, _, mut sat) in employee_query.iter_mut() {
-                    if emp.id == target_id {
+            InternalEvent::IncrementEmployeeSatisfaction {
+                employee_id: target_id,
+                amount,
+            } => {
+                for (_, internal_entity, _, _, _, mut sat) in employee_query.iter_mut(world) {
+                    if internal_entity.id == target_id {
                         sat.0 += amount as i32;
                         break;
                     }
                 }
             }
 
-            InternalEvent::IncrementSalary { target_id, amount } => {
-                for (emp, mut salary, _) in employee_query.iter_mut() {
-                    if emp.id == target_id {
+            InternalEvent::IncrementSalary {
+                employee_id: target_id,
+                amount,
+            } => {
+                for (_, internal_entity, _, _, mut salary, _) in employee_query.iter_mut(world) {
+                    if internal_entity.id == target_id {
                         salary.0 += amount as i32;
                         break;
                     }
@@ -72,13 +118,15 @@ pub fn process_internal_events(
             }
 
             InternalEvent::IncrementReputation { amount } => {
-                for (_, _, _, mut rep, _, _) in player_query.iter_mut() {
+                for (_, _, _, mut rep, _, _) in player_query.iter_mut(world) {
                     rep.0 += amount as i32;
                 }
             }
 
-            InternalEvent::RemoveOrgVp { target_id } => {
-                for mut org in organizations.iter_mut() {
+            InternalEvent::RemoveOrgVp {
+                organization_id: target_id,
+            } => {
+                for mut org in organizations.iter_mut(world) {
                     if org.id == target_id {
                         org.vp = None;
                     }
@@ -86,17 +134,36 @@ pub fn process_internal_events(
             }
 
             InternalEvent::AdvanceWeek => {
-                let (_, _, _, _, mut week, _) = player_query.single_mut();
+                let (_, _, _, _, mut week, _) = player_query.single_mut(world);
                 week.0 += 1;
             }
 
             InternalEvent::SetOrgVp {
-                target_id,
+                organization_id: target_id,
                 employee_id,
             } => {
-                for mut org in organizations.iter_mut() {
+                // Replace the existing vp
+                let mut vp_to_remove = None;
+                for mut org in organizations.iter_mut(world) {
                     if org.id == target_id {
+                        vp_to_remove = org.vp;
                         org.vp = Some(employee_id);
+                    }
+                }
+
+                // update employee titles
+                for (_, internal_entity, _, mut employed, _, _) in employee_query.iter_mut(world) {
+                    if internal_entity.id == employee_id {
+                        employed.role = OrgRole::VP;
+                        break;
+                    }
+                    if vp_to_remove.is_none() {
+                        break;
+                    }
+
+                    if internal_entity.id == vp_to_remove.unwrap() {
+                        employed.role = OrgRole::Employee;
+                        break;
                     }
                 }
             }

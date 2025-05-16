@@ -58,8 +58,9 @@ fn update_input(mut pending_player_input_action: ResMut<PendingPlayerInputAction
                     Some(PlayerInputAction::MenuRight)
                 }
 
+                KeyCode::Char('h') => Some(PlayerInputAction::SelectEmployeeToHire),
                 KeyCode::Char(' ') => Some(PlayerInputAction::DoNothing),
-                KeyCode::Char('p') => Some(PlayerInputAction::PromoteToVP),
+                KeyCode::Char('p') => Some(PlayerInputAction::SelectEmployeeForPromotionToVP),
                 KeyCode::Char('l') => Some(PlayerInputAction::LaunchPRCampaign),
                 KeyCode::Char('f') => Some(PlayerInputAction::SelectEmployeeToFire),
                 KeyCode::Char('r') => Some(PlayerInputAction::SelectEmployeeForRaise),

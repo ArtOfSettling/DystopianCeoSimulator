@@ -14,9 +14,12 @@ pub enum ClientCommand {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum InternalEvent {
-    SetEmployeeStatus {
-        target_id: Uuid,
-        status: EmploymentStatus,
+    RemoveEmployedStatus {
+        employee_id: Uuid,
+    },
+    AddEmployedStatus {
+        employee_id: Uuid,
+        organization_id: Uuid,
     },
     DecrementReputation {
         amount: u32,
@@ -25,11 +28,11 @@ pub enum InternalEvent {
         amount: u32,
     },
     IncrementEmployeeSatisfaction {
-        target_id: Uuid,
+        employee_id: Uuid,
         amount: u32,
     },
     IncrementSalary {
-        target_id: Uuid,
+        employee_id: Uuid,
         amount: u32,
     },
     IncrementReputation {
@@ -39,10 +42,10 @@ pub enum InternalEvent {
         amount: u32,
     },
     RemoveOrgVp {
-        target_id: Uuid,
+        organization_id: Uuid,
     },
     SetOrgVp {
-        target_id: Uuid,
+        organization_id: Uuid,
         employee_id: Uuid,
     },
     AdvanceWeek,
@@ -56,13 +59,20 @@ pub enum ServerEvent {
 }
 
 #[derive(Resource, Clone, Debug, Serialize, Deserialize)]
+pub enum UnemployedSnapshot {
+    UnemployedAnimalSnapshot(AnimalSnapshot),
+    UnemployedHumanSnapshot(HumanSnapshot),
+}
+
+#[derive(Resource, Clone, Debug, Serialize, Deserialize)]
 pub struct GameStateSnapshot {
     pub week: u32,
     pub money: i32,
     pub reputation: i32,
     pub organizations: Vec<OrganizationSnapshot>,
-    pub pets: Vec<PetSnapshot>,
-    pub children: Vec<ChildSnapshot>,
+    pub humans: Vec<HumanSnapshot>,
+    pub pets: Vec<AnimalSnapshot>,
+    pub unemployed: Vec<UnemployedSnapshot>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -79,35 +89,46 @@ pub struct EmployeeSnapshot {
     pub name: String,
     pub level: u32,
     pub satisfaction: i32,
-    pub employment_status: EmploymentStatus,
     pub salary: i32,
-    pub role: String,
+    pub role: OrgRole,
+    pub entity_type: EntityType,
     pub organization_id: Option<Uuid>,
     pub children_ids: Vec<Uuid>,
     pub pet_ids: Vec<Uuid>,
-    pub org_role: Option<OrgRole>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ChildSnapshot {
+pub struct HumanSnapshot {
     pub id: Uuid,
     pub name: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct PetSnapshot {
+pub struct AnimalSnapshot {
     pub id: Uuid,
     pub name: String,
-    pub pet_type: PetType,
+    pub entity_type: EntityType,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum PlayerAction {
-    FireEmployee(Uuid),
-    GiveRaise(Uuid, u32),
+    FireEmployee {
+        employee_id: Uuid,
+    },
+    HireEmployee {
+        employee_id: Uuid,
+        organization_id: Uuid,
+    },
+    GiveRaise {
+        employee_id: Uuid,
+        amount: u32,
+    },
     LaunchPRCampaign,
     DoNothing,
-    PromoteToVp { target_id: Uuid, employee_id: Uuid },
+    PromoteToVp {
+        organization_id: Uuid,
+        employee_id: Uuid,
+    },
 }
 
 #[derive(Resource, Default, Debug)]

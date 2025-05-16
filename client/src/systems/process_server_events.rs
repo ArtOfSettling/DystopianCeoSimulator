@@ -30,7 +30,8 @@ pub fn process_server_events(
             game_state_snapshot.reputation = rx_game_state_snapshot.reputation;
             game_state_snapshot.organizations = rx_game_state_snapshot.organizations;
             game_state_snapshot.pets = rx_game_state_snapshot.pets;
-            game_state_snapshot.children = rx_game_state_snapshot.children;
+            game_state_snapshot.humans = rx_game_state_snapshot.humans;
+            game_state_snapshot.unemployed = rx_game_state_snapshot.unemployed;
         }
     }
 }

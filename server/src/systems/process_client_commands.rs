@@ -1,22 +1,17 @@
 use crate::InternalEventSender;
 use crate::systems::FanOutClientCommandReceiver;
-use bevy::prelude::{Query, Res};
+use bevy::prelude::{Query, Res, With, Without};
 use shared::{
-    ClientCommand, Employee, EmploymentStatus, InternalEvent, Organization, PlayerAction,
-    Productivity, Salary, Satisfaction,
+    ClientCommand, Employed, InternalEntity, InternalEvent, Name, PlayerAction, Salary,
+    Satisfaction,
 };
 use tracing::info;
 
 pub fn process_client_commands(
     channel: Res<FanOutClientCommandReceiver>,
     internal_event_sender: Res<InternalEventSender>,
-    mut employee_query: Query<(
-        &mut Employee,
-        &mut Salary,
-        &mut Satisfaction,
-        &mut Productivity,
-    )>,
-    mut organization_query: Query<&Organization>,
+    employee_query: Query<(&InternalEntity, &Name, &Salary, &Satisfaction), With<Employed>>,
+    entity_query: Query<(&InternalEntity, &Name), Without<Employed>>,
 ) {
     while let Ok((_, client_command)) = channel.rx_fan_out_client_commands.try_recv() {
         info!(
@@ -25,50 +20,50 @@ pub fn process_client_commands(
         );
         match client_command {
             ClientCommand::PlayerAction(player_action) => match player_action {
-                PlayerAction::FireEmployee(target_id) => {
-                    for (employee, _, _, _) in employee_query.iter_mut() {
-                        if employee.id == target_id {
-                            info!("Firing employee: {}", employee.name);
+                PlayerAction::FireEmployee { employee_id } => {
+                    for (internal_entity, name, _, _) in employee_query.iter() {
+                        if internal_entity.id == employee_id {
+                            info!("Firing employee: {}", name.0);
                             internal_event_sender
                                 .tx_internal_events
-                                .try_send(InternalEvent::SetEmployeeStatus {
-                                    target_id: employee.id,
-                                    status: EmploymentStatus::Fired,
+                                .try_send(InternalEvent::RemoveEmployedStatus {
+                                    employee_id: internal_entity.id,
                                 })
                                 .unwrap();
-
-                            internal_event_sender
-                                .tx_internal_events
-                                .try_send(InternalEvent::DecrementReputation { amount: 1 })
-                                .unwrap();
-
-                            for org in organization_query.iter_mut() {
-                                match org.vp {
-                                    None => {}
-                                    Some(org_vp_id) => {
-                                        if org_vp_id == employee.id {
-                                            internal_event_sender
-                                                .tx_internal_events
-                                                .try_send(InternalEvent::RemoveOrgVp {
-                                                    target_id: org.id,
-                                                })
-                                                .unwrap();
-                                        }
-                                    }
-                                }
-                            }
                             break;
                         }
                     }
                 }
 
-                PlayerAction::GiveRaise(target_id, raise_amount) => {
-                    for (employee, _, _, _) in employee_query.iter_mut() {
-                        if employee.id == target_id {
+                PlayerAction::HireEmployee {
+                    organization_id,
+                    employee_id,
+                } => {
+                    for (internal_entity, name) in entity_query.iter() {
+                        if internal_entity.id == employee_id {
+                            info!("Hiring employee: {}", name.0);
+                            internal_event_sender
+                                .tx_internal_events
+                                .try_send(InternalEvent::AddEmployedStatus {
+                                    organization_id,
+                                    employee_id,
+                                })
+                                .unwrap();
+                            break;
+                        }
+                    }
+                }
+
+                PlayerAction::GiveRaise {
+                    employee_id,
+                    amount,
+                } => {
+                    for (internal_entity, _, _, _) in employee_query.iter() {
+                        if internal_entity.id == employee_id {
                             internal_event_sender
                                 .tx_internal_events
                                 .try_send(InternalEvent::IncrementEmployeeSatisfaction {
-                                    target_id: employee.id,
+                                    employee_id,
                                     amount: 1,
                                 })
                                 .unwrap();
@@ -76,8 +71,8 @@ pub fn process_client_commands(
                             internal_event_sender
                                 .tx_internal_events
                                 .try_send(InternalEvent::IncrementSalary {
-                                    target_id: employee.id,
-                                    amount: raise_amount,
+                                    employee_id,
+                                    amount,
                                 })
                                 .unwrap();
                         }
@@ -101,13 +96,13 @@ pub fn process_client_commands(
                 }
 
                 PlayerAction::PromoteToVp {
-                    target_id,
+                    organization_id,
                     employee_id,
                 } => {
                     internal_event_sender
                         .tx_internal_events
                         .try_send(InternalEvent::SetOrgVp {
-                            target_id,
+                            organization_id,
                             employee_id,
                         })
                         .unwrap();
@@ -117,14 +112,12 @@ pub fn process_client_commands(
 
         let total_productivity: u32 = employee_query
             .iter()
-            .filter(|(emp, _, _, _)| emp.employment_status == EmploymentStatus::Active)
-            .map(|(_, _, sat, _)| sat.0 as u32)
+            .map(|(_, _, _, sat)| sat.0 as u32)
             .sum();
 
         let total_expenses: u32 = employee_query
             .iter()
-            .filter(|(emp, _, _, _)| emp.employment_status == EmploymentStatus::Active)
-            .map(|(_, sal, _, _)| sal.0 as u32 / 52)
+            .map(|(_, _, sal, _)| sal.0 as u32 / 52)
             .sum();
 
         internal_event_sender

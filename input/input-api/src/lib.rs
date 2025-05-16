@@ -14,8 +14,9 @@ pub enum PlayerInputAction {
 
     LaunchPRCampaign,
     SelectEmployeeToFire,
+    SelectEmployeeToHire,
     SelectEmployeeForRaise,
-    PromoteToVP,
+    SelectEmployeeForPromotionToVP,
 
     MenuUp,
     MenuDown,

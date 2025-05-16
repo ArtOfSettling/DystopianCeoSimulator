@@ -71,7 +71,7 @@ async fn setup_connection_handler(
             let addr_str = addr.to_string();
             let uuid = Uuid::new_v5(&Uuid::NAMESPACE_DNS, addr_str.as_bytes());
             tx_internal_server_commands
-                .send(PlayerConnected(InternalEntity::new(uuid)))
+                .send(PlayerConnected(InternalEntity { id: uuid }))
                 .await
                 .unwrap();
 

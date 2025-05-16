@@ -1,8 +1,8 @@
 use bevy::prelude::Commands;
 use shared::{
-    CatBreed, Child, Company, DogBreed, Employee, EmployeeFlag, EmployeeFlags, EmploymentStatus,
-    HorseBreed, Level, LizardBreed, Money, OrgRole, Organization, OrganizationMember, Pet, PetType,
-    Player, Productivity, Reputation, Salary, Satisfaction, Week,
+    CatBreed, Company, DogBreed, Employed, EmployeeFlag, EmployeeFlags, EntityType, HorseBreed,
+    InternalEntity, Level, LizardBreed, Money, Name, OrgRole, Organization, Owner, Player,
+    Productivity, Reputation, Salary, Satisfaction, Type, Week,
 };
 use tracing::info;
 use uuid::Uuid;
@@ -30,14 +30,11 @@ pub fn setup_world_state(mut commands: Commands) {
     info!("spawning vp of Red Division");
     let alice_id = Uuid::from_u128(101);
     commands.spawn((
-        Employee {
-            id: alice_id,
-            name: "Alice".into(),
-            role: "VP of Red".into(),
-            employment_status: EmploymentStatus::Active,
-        },
-        OrganizationMember {
-            organization_id: org1_id,
+        InternalEntity { id: alice_id },
+        Name("Alice".into()),
+        Type(EntityType::Human),
+        Employed {
+            owner_id: org1_id,
             role: OrgRole::VP,
         },
         Level(10_000),
@@ -48,29 +45,37 @@ pub fn setup_world_state(mut commands: Commands) {
     ));
 
     info!("spawning vp of Red Division (children and pets)");
-    commands.spawn(Child {
-        id: Uuid::from_u128(1001),
-        name: "Little Al".into(),
-        parent_id: alice_id,
-    });
+    commands.spawn((
+        InternalEntity {
+            id: Uuid::from_u128(1001),
+        },
+        Name("Little Al".into()),
+        Type(EntityType::Human),
+        Owner {
+            owner_id: Some(alice_id),
+        },
+    ));
 
-    commands.spawn(Pet {
-        id: Uuid::from_u128(1002),
-        name: "Mittens".into(),
-        pet_type: PetType::Cat(CatBreed::Siamese),
-        owner_id: alice_id,
-    });
+    commands.spawn((
+        InternalEntity {
+            id: Uuid::from_u128(1002),
+        },
+        Name("Mittens".into()),
+        Type(EntityType::Cat(CatBreed::Siamese)),
+        Owner {
+            owner_id: Some(alice_id),
+        },
+    ));
 
     info!("spawning employees of Red Division");
     commands.spawn((
-        Employee {
+        InternalEntity {
             id: Uuid::from_u128(102),
-            name: "Bob".into(),
-            role: "Engineer".into(),
-            employment_status: EmploymentStatus::Active,
         },
-        OrganizationMember {
-            organization_id: org1_id,
+        Name("Bob".into()),
+        Type(EntityType::Human),
+        Employed {
+            owner_id: org1_id,
             role: OrgRole::Employee,
         },
         Level(10_000),
@@ -81,14 +86,13 @@ pub fn setup_world_state(mut commands: Commands) {
     ));
 
     commands.spawn((
-        Employee {
+        InternalEntity {
             id: Uuid::from_u128(103),
-            name: "Charlie".into(),
-            role: "Designer".into(),
-            employment_status: EmploymentStatus::Active,
         },
-        OrganizationMember {
-            organization_id: org1_id,
+        Name("Charlie".into()),
+        Type(EntityType::Human),
+        Employed {
+            owner_id: org1_id,
             role: OrgRole::Employee,
         },
         Level(10_000),
@@ -101,14 +105,13 @@ pub fn setup_world_state(mut commands: Commands) {
     info!("spawning vp of Blue Division");
     let diana_id = Uuid::from_u128(201);
     commands.spawn((
-        Employee {
+        InternalEntity {
             id: Uuid::from_u128(201),
-            name: "Diana".into(),
-            role: "VP of Blue".into(),
-            employment_status: EmploymentStatus::Active,
         },
-        OrganizationMember {
-            organization_id: org2_id,
+        Name("Diana".into()),
+        Type(EntityType::Human),
+        Employed {
+            owner_id: org2_id,
             role: OrgRole::VP,
         },
         Level(10_000),
@@ -119,37 +122,48 @@ pub fn setup_world_state(mut commands: Commands) {
     ));
 
     info!("spawning Diana's pet");
-    commands.spawn(Pet {
-        id: Uuid::from_u128(2001),
-        name: "Doge".into(),
-        pet_type: PetType::Dog(DogBreed::ShibaInu),
-        owner_id: diana_id,
-    });
+    commands.spawn((
+        InternalEntity {
+            id: Uuid::from_u128(2001),
+        },
+        Name("Doge".into()),
+        Type(EntityType::Dog(DogBreed::ShibaInu)),
+        Owner {
+            owner_id: Some(diana_id),
+        },
+    ));
 
-    commands.spawn(Pet {
-        id: Uuid::from_u128(2002),
-        name: "Horsy".into(),
-        pet_type: PetType::Horse(HorseBreed::Arabian),
-        owner_id: diana_id,
-    });
+    commands.spawn((
+        InternalEntity {
+            id: Uuid::from_u128(2002),
+        },
+        Name("Horsy".into()),
+        Type(EntityType::Horse(HorseBreed::Arabian)),
+        Owner {
+            owner_id: Some(diana_id),
+        },
+    ));
 
-    commands.spawn(Pet {
-        id: Uuid::from_u128(2003),
-        name: "Horse Face".into(),
-        pet_type: PetType::Horse(HorseBreed::Clydesdale),
-        owner_id: diana_id,
-    });
+    commands.spawn((
+        InternalEntity {
+            id: Uuid::from_u128(2003),
+        },
+        Name("Horse Face".into()),
+        Type(EntityType::Horse(HorseBreed::Clydesdale)),
+        Owner {
+            owner_id: Some(diana_id),
+        },
+    ));
 
     info!("spawning employees of Blue Division");
     commands.spawn((
-        Employee {
+        InternalEntity {
             id: Uuid::from_u128(202),
-            name: "Eli".into(),
-            role: "QA Analyst".into(),
-            employment_status: EmploymentStatus::Active,
         },
-        OrganizationMember {
-            organization_id: org2_id,
+        Name("Eli".into()),
+        Type(EntityType::Human),
+        Employed {
+            owner_id: org2_id,
             role: OrgRole::Employee,
         },
         Level(10_000),
@@ -161,14 +175,11 @@ pub fn setup_world_state(mut commands: Commands) {
 
     let faye_id = Uuid::from_u128(203);
     commands.spawn((
-        Employee {
-            id: faye_id,
-            name: "Faye".into(),
-            role: "Marketing".into(),
-            employment_status: EmploymentStatus::Active,
-        },
-        OrganizationMember {
-            organization_id: org2_id,
+        InternalEntity { id: faye_id },
+        Name("Faye".into()),
+        Type(EntityType::Human),
+        Employed {
+            owner_id: org2_id,
             role: OrgRole::Employee,
         },
         Level(10_000),
@@ -178,12 +189,16 @@ pub fn setup_world_state(mut commands: Commands) {
         EmployeeFlags(vec![EmployeeFlag::BurnedOut]),
     ));
 
-    commands.spawn(Pet {
-        id: Uuid::from_u128(2004),
-        name: "Beardy".into(),
-        pet_type: PetType::Lizard(LizardBreed::BeardedDragon),
-        owner_id: faye_id,
-    });
+    commands.spawn((
+        InternalEntity {
+            id: Uuid::from_u128(2004),
+        },
+        Name("Beardy".into()),
+        Type(EntityType::Lizard(LizardBreed::BeardedDragon)),
+        Owner {
+            owner_id: Some(faye_id),
+        },
+    ));
 
     info!("spawning Company");
     commands.insert_resource(Company {

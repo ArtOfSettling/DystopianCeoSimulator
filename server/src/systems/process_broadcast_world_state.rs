@@ -1,10 +1,10 @@
 use crate::NeedsWorldBroadcast;
 use crate::systems::ServerEventSender;
-use bevy::prelude::{Query, Res, ResMut};
+use bevy::prelude::{Query, Res, ResMut, Without};
 use shared::{
-    Child, ChildSnapshot, Employee, EmployeeSnapshot, GameStateSnapshot, InternalEntity, Level,
-    Money, Organization, OrganizationMember, OrganizationSnapshot, Pet, PetSnapshot, Player,
-    Reputation, Salary, Satisfaction, ServerEvent, Week,
+    AnimalSnapshot, Employed, EmployeeSnapshot, EntityType, GameStateSnapshot, HumanSnapshot,
+    InternalEntity, Level, Money, Name, Organization, OrganizationSnapshot, Owner, Player,
+    Reputation, Salary, Satisfaction, ServerEvent, Type, UnemployedSnapshot, Week,
 };
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -15,15 +15,17 @@ pub fn process_broadcast_world_state(
     query_rep: Query<&Reputation>,
     query_player: Query<(&Player, &Money, &Reputation, &Week, Option<&InternalEntity>)>,
     query_organizations: Query<&Organization>,
-    query_org_members: Query<(
-        &OrganizationMember,
-        &Employee,
+    employee_query: Query<(
+        &InternalEntity,
+        &Name,
+        &Employed,
         &Salary,
         &Satisfaction,
+        Option<&Owner>,
         &Level,
+        &Type,
     )>,
-    query_pet: Query<&Pet>,
-    query_child: Query<&Child>,
+    entity_query: Query<(&InternalEntity, &Name, Option<&Owner>, &Type), Without<Employed>>,
     server_event_sender: Res<ServerEventSender>,
 ) {
     // Only send if there's a connected player and we're due to broadcast
@@ -38,31 +40,34 @@ pub fn process_broadcast_world_state(
 
     let mut org_map: HashMap<Uuid, Vec<EmployeeSnapshot>> = HashMap::new();
 
-    for (org_member, emp, sal, sat, lvl) in query_org_members.iter() {
+    for (internal_entity, name, employed, sal, sat, _, lvl, type_) in employee_query.iter() {
         let emp_snapshot = EmployeeSnapshot {
-            id: emp.id,
-            name: emp.name.clone(),
+            id: internal_entity.id,
+            name: name.0.clone(),
             satisfaction: sat.0,
-            employment_status: emp.employment_status.clone(),
             salary: sal.0,
-            role: emp.role.clone(),
+            role: employed.role.clone(),
             level: lvl.0,
-            organization_id: Some(org_member.organization_id.clone()),
-            org_role: Some(org_member.role.clone()),
-            children_ids: query_child
+            entity_type: type_.0.clone(),
+            organization_id: Some(employed.owner_id.clone()),
+            children_ids: entity_query
                 .iter()
-                .filter(|child| child.parent_id == emp.id)
-                .map(|child| child.id)
+                .filter(|(_, _, owner, _)| owner.is_some())
+                .filter(|(_, _, owner, _)| owner.unwrap().owner_id.unwrap() == internal_entity.id)
+                .filter(|(_, _, _, type_)| type_.0 == EntityType::Human)
+                .map(|(internal_entity, _, _, _)| internal_entity.id)
                 .collect(),
-            pet_ids: query_pet
+            pet_ids: entity_query
                 .iter()
-                .filter(|pet| pet.owner_id == emp.id)
-                .map(|pet| pet.id)
+                .filter(|(_, _, owner, _)| owner.is_some())
+                .filter(|(_, _, owner, _)| owner.unwrap().owner_id.unwrap() == internal_entity.id)
+                .filter(|(_, _, _, type_)| type_.0 != EntityType::Human)
+                .map(|(internal_entity, _, _, _)| internal_entity.id)
                 .collect(),
         };
 
         org_map
-            .entry(org_member.organization_id)
+            .entry(employed.owner_id)
             .or_default()
             .push(emp_snapshot);
     }
@@ -77,20 +82,37 @@ pub fn process_broadcast_world_state(
         })
         .collect::<Vec<_>>();
 
-    let pets = query_pet
+    let pets = entity_query
         .iter()
-        .map(|pet| PetSnapshot {
-            id: pet.id,
-            name: pet.name.clone(),
-            pet_type: pet.pet_type.clone(),
+        .filter(|(_, _, _, type_)| type_.0 != EntityType::Human)
+        .map(|(internal_entity, name, _owner, type_)| AnimalSnapshot {
+            id: internal_entity.id,
+            name: name.0.clone(),
+            entity_type: type_.0.clone(),
         })
         .collect::<Vec<_>>();
 
-    let children = query_child
+    let humans = entity_query
         .iter()
-        .map(|child| ChildSnapshot {
-            id: child.id,
-            name: child.name.clone(),
+        .filter(|(_, _, _, type_)| type_.0 == EntityType::Human)
+        .map(|(internal_entity, name, _owner, _type_)| HumanSnapshot {
+            id: internal_entity.id,
+            name: name.0.clone(),
+        })
+        .collect::<Vec<_>>();
+
+    let unemployed = entity_query
+        .iter()
+        .map(|(internal_entity, name, _, type_)| match type_.0 {
+            EntityType::Human => UnemployedSnapshot::UnemployedHumanSnapshot(HumanSnapshot {
+                id: internal_entity.id,
+                name: name.0.clone(),
+            }),
+            _ => UnemployedSnapshot::UnemployedAnimalSnapshot(AnimalSnapshot {
+                id: internal_entity.id,
+                name: name.0.clone(),
+                entity_type: type_.0.clone(),
+            }),
         })
         .collect::<Vec<_>>();
 
@@ -99,8 +121,9 @@ pub fn process_broadcast_world_state(
         money,
         reputation,
         organizations,
+        humans,
         pets,
-        children,
+        unemployed,
     };
 
     let _ = server_event_sender

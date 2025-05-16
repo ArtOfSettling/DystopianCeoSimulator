@@ -15,7 +15,8 @@ pub struct Reputation(pub i32);
 pub struct Week(pub u32);
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum PetType {
+pub enum EntityType {
+    Human,
     Cat(CatBreed),
     Dog(DogBreed),
     Horse(HorseBreed),
@@ -84,32 +85,20 @@ pub struct Organization {
 }
 
 #[derive(Component)]
-pub struct Employee {
-    pub id: Uuid,
-    pub name: String,
-    pub role: String,
-    pub employment_status: EmploymentStatus,
-}
-
-#[derive(Component)]
-pub struct Child {
-    pub id: Uuid,
-    pub name: String,
-    pub parent_id: Uuid,
-}
-
-#[derive(Component)]
-pub struct Pet {
-    pub id: Uuid,
-    pub name: String,
-    pub pet_type: PetType,
+pub struct Employed {
     pub owner_id: Uuid,
+    pub role: OrgRole,
 }
 
-#[derive(Component, Clone, Debug, Serialize, Deserialize)]
-pub struct OrganizationMember {
-    pub organization_id: Uuid,
-    pub role: OrgRole,
+#[derive(Component)]
+pub struct Name(pub String);
+
+#[derive(Component)]
+pub struct Type(pub EntityType);
+
+#[derive(Component)]
+pub struct Owner {
+    pub owner_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -147,11 +136,7 @@ pub enum EmployeeFlag {
     Loyal,
 }
 
-#[derive(Component, Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct InternalEntity(Uuid);
-
-impl InternalEntity {
-    pub fn new(uuid: Uuid) -> Self {
-        Self(uuid)
-    }
+#[derive(Component, Clone, Debug, Serialize, Deserialize)]
+pub struct InternalEntity {
+    pub id: Uuid,
 }
