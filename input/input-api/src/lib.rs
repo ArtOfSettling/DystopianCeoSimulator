@@ -9,8 +9,7 @@ pub struct PendingPlayerInputAction(pub Option<PlayerInputAction>);
 #[derive(Clone, Debug)]
 pub enum PlayerInputAction {
     DoNothing,
-
-    GoBack,
+    Quit,
 
     LaunchPRCampaign,
     SelectEmployeeToFire,
@@ -22,6 +21,7 @@ pub enum PlayerInputAction {
     MenuDown,
     MenuLeft,
     MenuRight,
-
     MenuSelect,
+    MenuBack,
+    MenuChangeTab,
 }

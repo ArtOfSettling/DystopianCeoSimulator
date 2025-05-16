@@ -43,8 +43,6 @@ fn update_input(mut pending_player_input_action: ResMut<PendingPlayerInputAction
             info!("Key pressed: {:?}", key_event);
 
             let command = match key_event.code {
-                KeyCode::Esc => Some(PlayerInputAction::GoBack),
-                KeyCode::Enter => Some(PlayerInputAction::MenuSelect),
                 KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
                     Some(PlayerInputAction::MenuUp)
                 }
@@ -52,11 +50,13 @@ fn update_input(mut pending_player_input_action: ResMut<PendingPlayerInputAction
                     Some(PlayerInputAction::MenuDown)
                 }
                 KeyCode::Left | KeyCode::Char('a') | KeyCode::Char('A') => {
-                    Some(PlayerInputAction::MenuLeft)
+                    Some(PlayerInputAction::MenuBack)
                 }
                 KeyCode::Right | KeyCode::Char('d') | KeyCode::Char('D') => {
-                    Some(PlayerInputAction::MenuRight)
+                    Some(PlayerInputAction::MenuSelect)
                 }
+
+                KeyCode::Tab => Some(PlayerInputAction::MenuChangeTab),
 
                 KeyCode::Char('h') => Some(PlayerInputAction::SelectEmployeeToHire),
                 KeyCode::Char(' ') => Some(PlayerInputAction::DoNothing),
@@ -64,6 +64,7 @@ fn update_input(mut pending_player_input_action: ResMut<PendingPlayerInputAction
                 KeyCode::Char('l') => Some(PlayerInputAction::LaunchPRCampaign),
                 KeyCode::Char('f') => Some(PlayerInputAction::SelectEmployeeToFire),
                 KeyCode::Char('r') => Some(PlayerInputAction::SelectEmployeeForRaise),
+                KeyCode::Char('q') => Some(PlayerInputAction::Quit),
 
                 _ => None,
             };
