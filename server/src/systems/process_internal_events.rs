@@ -148,22 +148,25 @@ pub fn process_internal_events(
                     if org.id == target_id {
                         vp_to_remove = org.vp;
                         org.vp = Some(employee_id);
+                        break;
                     }
                 }
 
                 // update employee titles
-                for (_, internal_entity, _, mut employed, _, _) in employee_query.iter_mut(world) {
+                for (_entity, internal_entity, _name, mut employed, _salary, _satisfaction) in
+                    employee_query.iter_mut(world)
+                {
                     if internal_entity.id == employee_id {
                         employed.role = OrgRole::VP;
-                        break;
+                        continue;
                     }
                     if vp_to_remove.is_none() {
-                        break;
+                        continue;
                     }
 
                     if internal_entity.id == vp_to_remove.unwrap() {
                         employed.role = OrgRole::Employee;
-                        break;
+                        continue;
                     }
                 }
             }

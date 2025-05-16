@@ -1,17 +1,19 @@
+mod cli;
 mod internal_commands;
 mod systems;
 
 use crate::systems::{
     process_broadcast_world_state, process_client_commands, process_command_log, process_event_log,
     process_fan_out_commands, process_fan_out_events, process_internal_commands,
-    process_internal_events, setup_command_log, setup_command_log_replay,
-    setup_connection_resources, setup_event_log, setup_fan_out_commands, setup_fan_out_events,
-    setup_world_state,
+    process_internal_events, setup_command_log, setup_connection_resources, setup_event_log,
+    setup_fan_out_commands, setup_fan_out_events, setup_redrive_command_log,
+    setup_redrive_event_log, setup_world_state,
 };
 use bevy::MinimalPlugins;
 use bevy::app::{App, FixedUpdate, PluginGroup, ScheduleRunnerPlugin, Startup};
 use bevy::prelude::IntoSystemConfigs;
 use bevy::time::{Fixed, Time};
+use cli::Cli;
 use std::time::Duration;
 use tracing::info;
 use tracing_appender::non_blocking::WorkerGuard;
@@ -33,6 +35,9 @@ fn main() -> anyhow::Result<()> {
     let _guard = setup_logging();
     info!("Logging configured");
 
+    let cli = Cli::parse();
+    info!("Cli: {:?}", cli);
+
     let (tx_internal_events, rx_internal_events) = unbounded();
 
     App::new()
@@ -41,19 +46,7 @@ fn main() -> anyhow::Result<()> {
         .insert_resource(NeedsWorldBroadcast::default())
         .insert_resource(InternalEventSender { tx_internal_events })
         .insert_resource(InternalEventReceiver { rx_internal_events })
-        .add_systems(
-            Startup,
-            (
-                setup_connection_resources,
-                setup_world_state,
-                setup_fan_out_commands,
-                setup_fan_out_events,
-                setup_command_log_replay,
-                setup_command_log,
-                setup_event_log,
-            )
-                .chain(),
-        )
+        .add_systems(Startup, build_setup_chain(&cli))
         .add_systems(
             FixedUpdate,
             (
@@ -76,6 +69,30 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+fn build_setup_chain(cli: &Cli) -> SystemConfigs {
+    let base = (
+        setup_connection_resources,
+        setup_world_state,
+        setup_fan_out_commands,
+        setup_fan_out_events,
+    )
+        .chain();
+
+    let with_redrive_cmds = if cli.redrive_command_log {
+        (base, setup_redrive_command_log).chain()
+    } else {
+        base
+    };
+
+    let with_redrive_events = if cli.redrive_event_log {
+        (with_redrive_cmds, setup_redrive_event_log).chain()
+    } else {
+        with_redrive_cmds
+    };
+
+    (with_redrive_events, setup_command_log, setup_event_log).chain()
+}
+
 fn setup_logging() -> WorkerGuard {
     use tracing_appender::non_blocking;
     use tracing_subscriber::EnvFilter;
@@ -94,7 +111,9 @@ fn setup_logging() -> WorkerGuard {
 }
 
 use async_channel::{Receiver, Sender, unbounded};
+use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
+use clap::Parser;
 use shared::InternalEvent;
 use std::fs::read_dir;
 use std::path::PathBuf;

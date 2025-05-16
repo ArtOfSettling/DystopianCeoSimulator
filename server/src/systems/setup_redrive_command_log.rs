@@ -5,18 +5,18 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use tracing::info;
 
-pub fn setup_command_log_replay(sender: Res<FanOutClientCommandSender>) {
+pub fn setup_redrive_command_log(sender: Res<FanOutClientCommandSender>) {
     let Some(log_path) = find_latest_log_file_in_folder("./_out/command_stream") else {
-        info!("No valid log file found.");
+        info!("No valid command log file found.");
         return;
     };
 
-    info!("Replaying log file: {:?}", log_path);
+    info!("Replaying command log file: {:?}", log_path);
 
     let file = match File::open(&log_path) {
         Ok(f) => f,
         Err(e) => {
-            info!("Failed to open log file: {}", e);
+            info!("Failed to open command log file: {}", e);
             return;
         }
     };
@@ -30,5 +30,5 @@ pub fn setup_command_log_replay(sender: Res<FanOutClientCommandSender>) {
         }
     }
 
-    info!("Replay complete.");
+    info!("Redrive Command Log Complete.");
 }
