@@ -92,6 +92,7 @@ pub struct EmployeeSnapshot {
     pub salary: i32,
     pub role: OrgRole,
     pub entity_type: EntityType,
+    pub week_of_birth: i32,
     pub organization_id: Option<Uuid>,
     pub children_ids: Vec<Uuid>,
     pub pet_ids: Vec<Uuid>,
@@ -101,6 +102,7 @@ pub struct EmployeeSnapshot {
 pub struct HumanSnapshot {
     pub id: Uuid,
     pub name: String,
+    pub week_of_birth: i32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -108,6 +110,7 @@ pub struct AnimalSnapshot {
     pub id: Uuid,
     pub name: String,
     pub entity_type: EntityType,
+    pub week_of_birth: i32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

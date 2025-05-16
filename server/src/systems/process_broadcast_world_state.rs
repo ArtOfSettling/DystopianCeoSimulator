@@ -4,7 +4,7 @@ use bevy::prelude::{Query, Res, ResMut, Without};
 use shared::{
     AnimalSnapshot, Employed, EmployeeSnapshot, EntityType, GameStateSnapshot, HumanSnapshot,
     InternalEntity, Level, Money, Name, Organization, OrganizationSnapshot, Owner, Player,
-    Reputation, Salary, Satisfaction, ServerEvent, Type, UnemployedSnapshot, Week,
+    Reputation, Salary, Satisfaction, ServerEvent, Type, UnemployedSnapshot, Week, WeekOfBirth,
 };
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -24,8 +24,12 @@ pub fn process_broadcast_world_state(
         Option<&Owner>,
         &Level,
         &Type,
+        &WeekOfBirth,
     )>,
-    entity_query: Query<(&InternalEntity, &Name, Option<&Owner>, &Type), Without<Employed>>,
+    entity_query: Query<
+        (&InternalEntity, &Name, Option<&Owner>, &Type, &WeekOfBirth),
+        Without<Employed>,
+    >,
     server_event_sender: Res<ServerEventSender>,
 ) {
     // Only send if there's a connected player and we're due to broadcast
@@ -40,7 +44,9 @@ pub fn process_broadcast_world_state(
 
     let mut org_map: HashMap<Uuid, Vec<EmployeeSnapshot>> = HashMap::new();
 
-    for (internal_entity, name, employed, sal, sat, _, lvl, type_) in employee_query.iter() {
+    for (internal_entity, name, employed, sal, sat, _, lvl, type_, week_of_birth) in
+        employee_query.iter()
+    {
         let emp_snapshot = EmployeeSnapshot {
             id: internal_entity.id,
             name: name.0.clone(),
@@ -50,19 +56,24 @@ pub fn process_broadcast_world_state(
             level: lvl.0,
             entity_type: type_.0.clone(),
             organization_id: Some(employed.owner_id.clone()),
+            week_of_birth: week_of_birth.0,
             children_ids: entity_query
                 .iter()
-                .filter(|(_, _, owner, _)| owner.is_some())
-                .filter(|(_, _, owner, _)| owner.unwrap().owner_id.unwrap() == internal_entity.id)
-                .filter(|(_, _, _, type_)| type_.0 == EntityType::Human)
-                .map(|(internal_entity, _, _, _)| internal_entity.id)
+                .filter(|(_, _, owner, _, _)| owner.is_some())
+                .filter(|(_, _, owner, _, _)| {
+                    owner.unwrap().owner_id.unwrap() == internal_entity.id
+                })
+                .filter(|(_, _, _, type_, _)| type_.0 == EntityType::Human)
+                .map(|(internal_entity, _, _, _, _)| internal_entity.id)
                 .collect(),
             pet_ids: entity_query
                 .iter()
-                .filter(|(_, _, owner, _)| owner.is_some())
-                .filter(|(_, _, owner, _)| owner.unwrap().owner_id.unwrap() == internal_entity.id)
-                .filter(|(_, _, _, type_)| type_.0 != EntityType::Human)
-                .map(|(internal_entity, _, _, _)| internal_entity.id)
+                .filter(|(_, _, owner, _, _)| owner.is_some())
+                .filter(|(_, _, owner, _, _)| {
+                    owner.unwrap().owner_id.unwrap() == internal_entity.id
+                })
+                .filter(|(_, _, _, type_, _)| type_.0 != EntityType::Human)
+                .map(|(internal_entity, _, _, _, _)| internal_entity.id)
                 .collect(),
         };
 
@@ -84,36 +95,46 @@ pub fn process_broadcast_world_state(
 
     let pets = entity_query
         .iter()
-        .filter(|(_, _, _, type_)| type_.0 != EntityType::Human)
-        .map(|(internal_entity, name, _owner, type_)| AnimalSnapshot {
-            id: internal_entity.id,
-            name: name.0.clone(),
-            entity_type: type_.0.clone(),
-        })
+        .filter(|(_, _, _, type_, _)| type_.0 != EntityType::Human)
+        .map(
+            |(internal_entity, name, _owner, type_, week_of_birth)| AnimalSnapshot {
+                id: internal_entity.id,
+                name: name.0.clone(),
+                entity_type: type_.0.clone(),
+                week_of_birth: week_of_birth.0,
+            },
+        )
         .collect::<Vec<_>>();
 
     let humans = entity_query
         .iter()
-        .filter(|(_, _, _, type_)| type_.0 == EntityType::Human)
-        .map(|(internal_entity, name, _owner, _type_)| HumanSnapshot {
-            id: internal_entity.id,
-            name: name.0.clone(),
-        })
+        .filter(|(_, _, _, type_, _)| type_.0 == EntityType::Human)
+        .map(
+            |(internal_entity, name, _owner, _type_, week_of_birth)| HumanSnapshot {
+                id: internal_entity.id,
+                name: name.0.clone(),
+                week_of_birth: week_of_birth.0,
+            },
+        )
         .collect::<Vec<_>>();
 
     let unemployed = entity_query
         .iter()
-        .map(|(internal_entity, name, _, type_)| match type_.0 {
-            EntityType::Human => UnemployedSnapshot::UnemployedHumanSnapshot(HumanSnapshot {
-                id: internal_entity.id,
-                name: name.0.clone(),
-            }),
-            _ => UnemployedSnapshot::UnemployedAnimalSnapshot(AnimalSnapshot {
-                id: internal_entity.id,
-                name: name.0.clone(),
-                entity_type: type_.0.clone(),
-            }),
-        })
+        .map(
+            |(internal_entity, name, _, type_, week_of_birth)| match type_.0 {
+                EntityType::Human => UnemployedSnapshot::UnemployedHumanSnapshot(HumanSnapshot {
+                    id: internal_entity.id,
+                    name: name.0.clone(),
+                    week_of_birth: week_of_birth.0,
+                }),
+                _ => UnemployedSnapshot::UnemployedAnimalSnapshot(AnimalSnapshot {
+                    id: internal_entity.id,
+                    name: name.0.clone(),
+                    entity_type: type_.0.clone(),
+                    week_of_birth: week_of_birth.0,
+                }),
+            },
+        )
         .collect::<Vec<_>>();
 
     let snapshot = GameStateSnapshot {

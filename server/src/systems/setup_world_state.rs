@@ -2,7 +2,7 @@ use bevy::prelude::Commands;
 use shared::{
     CatBreed, Company, DogBreed, Employed, EmployeeFlag, EmployeeFlags, EntityType, HorseBreed,
     InternalEntity, Level, LizardBreed, Money, Name, OrgRole, Organization, Owner, Player,
-    Productivity, Reputation, Salary, Satisfaction, Type, Week,
+    Productivity, Reputation, Salary, Satisfaction, Type, Week, WeekOfBirth,
 };
 use tracing::info;
 use uuid::Uuid;
@@ -14,6 +14,8 @@ pub fn setup_world_state(mut commands: Commands) {
     info!("spawning organizations");
     let org1_id = Uuid::from_u128(1);
     let org2_id = Uuid::from_u128(2);
+
+    let starting_week = 0i32;
 
     commands.spawn(Organization {
         id: org1_id,
@@ -41,6 +43,7 @@ pub fn setup_world_state(mut commands: Commands) {
         Satisfaction(85),
         Productivity(90),
         Salary(12_000),
+        WeekOfBirth(starting_week.saturating_sub(57 * 52 + 2 * 4 + 6)), // 57 years old
         EmployeeFlags(vec![EmployeeFlag::Loyal]),
     ));
 
@@ -54,6 +57,7 @@ pub fn setup_world_state(mut commands: Commands) {
         Owner {
             owner_id: Some(alice_id),
         },
+        WeekOfBirth(starting_week.saturating_sub(8 * 52 + 9 * 6 + 6)), // 8 years old
     ));
 
     commands.spawn((
@@ -65,6 +69,7 @@ pub fn setup_world_state(mut commands: Commands) {
         Owner {
             owner_id: Some(alice_id),
         },
+        WeekOfBirth(starting_week.saturating_sub(1 * 52 + 1 * 4 + 1)), // 1 year old
     ));
 
     info!("spawning employees of Red Division");
@@ -83,6 +88,7 @@ pub fn setup_world_state(mut commands: Commands) {
         Productivity(75),
         Salary(8_000),
         EmployeeFlags(vec![]),
+        WeekOfBirth(starting_week.saturating_sub(31 * 52)), // 31 years old
     ));
 
     commands.spawn((
@@ -100,6 +106,7 @@ pub fn setup_world_state(mut commands: Commands) {
         Productivity(65),
         Salary(7_500),
         EmployeeFlags(vec![EmployeeFlag::WantsRaise]),
+        WeekOfBirth(starting_week.saturating_sub(27 * 52)), // 27 years old
     ));
 
     info!("spawning vp of Blue Division");
@@ -119,6 +126,7 @@ pub fn setup_world_state(mut commands: Commands) {
         Productivity(95),
         Salary(13_000),
         EmployeeFlags(vec![]),
+        WeekOfBirth(starting_week.saturating_sub(89 * 52 + 10 * 4 + 10)), // 89 years old
     ));
 
     info!("spawning Diana's pet");
@@ -131,6 +139,7 @@ pub fn setup_world_state(mut commands: Commands) {
         Owner {
             owner_id: Some(diana_id),
         },
+        WeekOfBirth(starting_week.saturating_sub(7 * 52 + 4 * 4 + 2)), // 7 years old
     ));
 
     commands.spawn((
@@ -142,6 +151,7 @@ pub fn setup_world_state(mut commands: Commands) {
         Owner {
             owner_id: Some(diana_id),
         },
+        WeekOfBirth(starting_week.saturating_sub(4 * 52 + 8 * 4 + 1)), // 4 years old
     ));
 
     commands.spawn((
@@ -153,6 +163,7 @@ pub fn setup_world_state(mut commands: Commands) {
         Owner {
             owner_id: Some(diana_id),
         },
+        WeekOfBirth(starting_week.saturating_sub(9 * 52)), // 9 years old
     ));
 
     info!("spawning employees of Blue Division");
@@ -171,6 +182,7 @@ pub fn setup_world_state(mut commands: Commands) {
         Productivity(70),
         Salary(6_500),
         EmployeeFlags(vec![]),
+        WeekOfBirth(starting_week.saturating_sub(32 * 52)), // 32 years old
     ));
 
     let faye_id = Uuid::from_u128(203);
@@ -187,6 +199,7 @@ pub fn setup_world_state(mut commands: Commands) {
         Productivity(80),
         Salary(7_000),
         EmployeeFlags(vec![EmployeeFlag::BurnedOut]),
+        WeekOfBirth(starting_week.saturating_sub(39 * 52)), // 39 years old
     ));
 
     commands.spawn((
@@ -198,6 +211,7 @@ pub fn setup_world_state(mut commands: Commands) {
         Owner {
             owner_id: Some(faye_id),
         },
+        WeekOfBirth(starting_week.saturating_sub(2 * 52)), // 2 years old
     ));
 
     info!("spawning Company");

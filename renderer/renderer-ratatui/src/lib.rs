@@ -218,6 +218,7 @@ impl Renderer for RatatuiRenderer {
                             draw_employee_details(
                                 frame,
                                 right_pane,
+                                game_state_snapshot.week as i32,
                                 emp,
                                 &game_state_snapshot.pets,
                                 &game_state_snapshot.humans,
@@ -239,6 +240,7 @@ impl Renderer for RatatuiRenderer {
                         draw_candidate_details(
                             frame,
                             right_pane,
+                            game_state_snapshot.week as i32,
                             person,
                             game_state_snapshot
                                 .organizations
@@ -350,12 +352,17 @@ fn draw_employee_list(
 fn draw_employee_details(
     frame: &mut Frame,
     rect: Rect,
+    current_week: i32,
     employee_snapshot: &EmployeeSnapshot,
     pets_snapshot: &Vec<AnimalSnapshot>,
     children_snapshot: &Vec<HumanSnapshot>,
 ) {
     let mut lines = vec![
         format!("Name: {}", employee_snapshot.name),
+        format!(
+            "Age: {}",
+            get_age_description(current_week.saturating_sub(employee_snapshot.week_of_birth) as u32)
+        ),
         format!("Type: {:?}", employee_snapshot.entity_type),
         format!("Role: {:?}", employee_snapshot.role),
         format!("Level: {}", employee_snapshot.level),
@@ -431,6 +438,7 @@ fn draw_unemployed_list(
 fn draw_candidate_details(
     frame: &mut Frame,
     rect: Rect,
+    current_week: i32,
     unemployed_snapshot: &UnemployedSnapshot,
     org_snapshot: &OrganizationSnapshot,
 ) {
@@ -440,6 +448,10 @@ fn draw_candidate_details(
         UnemployedSnapshot::UnemployedAnimalSnapshot(animal) => {
             lines.push(format!("Name: {}", animal.name));
             lines.push(format!("Type: {:?}", animal.entity_type));
+            lines.push(format!(
+                "Age: {}",
+                get_age_description(current_week.saturating_sub(animal.week_of_birth) as u32)
+            ));
             lines.push(format!("ID: {}", animal.id));
             lines.push("—".into());
             lines.push(format!("Considering Org: {}", org_snapshot.name));
@@ -447,6 +459,10 @@ fn draw_candidate_details(
         UnemployedSnapshot::UnemployedHumanSnapshot(human) => {
             lines.push(format!("Name: {}", human.name));
             lines.push(format!("ID: {}", human.id));
+            lines.push(format!(
+                "Age: {}",
+                get_age_description(current_week.saturating_sub(human.week_of_birth) as u32)
+            ));
             lines.push("—".into());
             lines.push(format!("Considering Org: {}", org_snapshot.name));
         }
@@ -461,6 +477,12 @@ fn draw_candidate_details(
         .wrap(Wrap { trim: true });
 
     frame.render_widget(paragraph, rect);
+}
+
+fn get_age_description(weeks: u32) -> String {
+    let years = weeks / 52;
+    let remaining_weeks = weeks % 52;
+    format!("{} years, {} weeks", years, remaining_weeks)
 }
 
 fn render_system(

@@ -127,6 +127,9 @@ pub struct Productivity(pub i32);
 pub struct Salary(pub i32);
 
 #[derive(Component)]
+pub struct WeekOfBirth(pub i32);
+
+#[derive(Component)]
 pub struct EmployeeFlags(pub Vec<EmployeeFlag>);
 
 #[derive(Debug, Clone)]
