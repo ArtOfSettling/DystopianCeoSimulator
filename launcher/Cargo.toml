@@ -5,6 +5,9 @@ edition = "2024"
 publish = false
 
 [dependencies]
+server = { path = "../server" }
+client = { path = "../client" }
+
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 tracing-appender = "0.2.3"
