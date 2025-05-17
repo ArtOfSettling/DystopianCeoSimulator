@@ -30,7 +30,7 @@ pub fn handle_input(
     pending_player_action: &mut ResMut<PendingPlayerAction>,
 ) -> bool {
     if let PlayerInputAction::MenuChangeTab = player_input_action {
-        if let Some(new_tab) = try_switch_tab(&nav.current()) {
+        if let Some(new_tab) = try_switch_tab(nav.current()) {
             NavigationAction::Switch(new_tab).apply(nav);
         }
     }
@@ -38,22 +38,19 @@ pub fn handle_input(
     match player_input_action {
         PlayerInputAction::Quit => return NavigationAction::Quit.apply(nav),
         PlayerInputAction::MenuBack => return NavigationAction::Pop.apply(nav),
-        PlayerInputAction::MenuSelect => match nav.current() {
-            Route::OrganizationList { data } => {
-                NavigationAction::Push(Route::OrganizationView {
-                    data: OrganizationView {
-                        selected_index: 0,
-                        organization_id: game_state_snapshot
-                            .organizations
-                            .get(data.selected_index)
-                            .unwrap()
-                            .id,
-                        tab: OrganizationTab::Detail,
-                    },
-                })
-                .apply(nav);
-            }
-            _ => {}
+        PlayerInputAction::MenuSelect => if let Route::OrganizationList { data } = nav.current() {
+            NavigationAction::Push(Route::OrganizationView {
+                data: OrganizationView {
+                    selected_index: 0,
+                    organization_id: game_state_snapshot
+                        .organizations
+                        .get(data.selected_index)
+                        .unwrap()
+                        .id,
+                    tab: OrganizationTab::Detail,
+                },
+            })
+            .apply(nav);
         },
         _ => {}
     }

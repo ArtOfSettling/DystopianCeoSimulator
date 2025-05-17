@@ -38,19 +38,16 @@ pub fn render_hiring(
 pub fn draw_unemployed_list(
     frame: &mut Frame,
     rect: &Rect,
-    unemployed_snapshot: &Vec<UnemployedSnapshot>,
+    unemployed_snapshot: &[UnemployedSnapshot],
     selected_index: usize,
 ) {
     let items: Vec<ListItem> = unemployed_snapshot
         .iter()
         .map(|p| {
-            ListItem::new(format!(
-                "{}",
-                match p {
+            ListItem::new((match p {
                     UnemployedSnapshot::UnemployedAnimalSnapshot(animal) => animal.name.clone(),
                     UnemployedSnapshot::UnemployedHumanSnapshot(human) => human.name.clone(),
-                }
-            ))
+                }).to_string())
         })
         .collect();
 

@@ -6,7 +6,6 @@ use async_std::net::{TcpListener, TcpStream};
 use async_std::task::sleep;
 use bevy::prelude::{Commands, Resource};
 use bevy::tasks::IoTaskPool;
-use bincode;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use futures::{AsyncWriteExt, FutureExt};
 use shared::components::InternalEntity;
@@ -111,22 +110,19 @@ async fn handle_client(
     loop {
         futures::select! {
             maybe_server_command = rx_server_commands.recv().fuse() => {
-                match maybe_server_command {
-                    Ok(server_command) => {
-                        let mut message = Vec::new();
-                        let serialized = bincode::serialize(&server_command).unwrap();
-                        // first write the buffer size
-                        let length = serialized.len() as u32;
-                        message.write_u32::<BigEndian>(length).unwrap();
-                        // append the actual payload
-                        message.extend_from_slice(&serialized);
+                if let Ok(server_command) = maybe_server_command {
+                    let mut message = Vec::new();
+                    let serialized = bincode::serialize(&server_command).unwrap();
+                    // first write the buffer size
+                    let length = serialized.len() as u32;
+                    message.write_u32::<BigEndian>(length).unwrap();
+                    // append the actual payload
+                    message.extend_from_slice(&serialized);
 
-                        // then write the buffer
-                        if let Err(e) = stream.write_all(&message).await {
-                            error!("Failed to send broadcast to client: {:?}", e);
-                        }
+                    // then write the buffer
+                    if let Err(e) = stream.write_all(&message).await {
+                        error!("Failed to send broadcast to client: {:?}", e);
                     }
-                    Err(_) => {}
                 }
             },
 

@@ -51,7 +51,7 @@ impl RatatuiRenderer {
             }
 
             let current = self.navigation_stack.current();
-            render(&current, game_state_snapshot, frame);
+            render(current, game_state_snapshot, frame);
         })
     }
 }

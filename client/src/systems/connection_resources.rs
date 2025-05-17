@@ -4,7 +4,6 @@ use async_std::net::TcpStream;
 use bevy::prelude::{Commands, Resource};
 use bevy::tasks::IoTaskPool;
 use bevy::tasks::futures_lite::AsyncWriteExt;
-use bincode;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use futures::FutureExt;
 use shared::{ClientCommand, ServerEvent};
@@ -48,22 +47,19 @@ async fn handle_server(
     loop {
         futures::select! {
             maybe_client_command = rx_client_commands.recv().fuse() => {
-                match maybe_client_command {
-                    Ok(client_command) => {
-                        let mut message = Vec::new();
-                        let serialized = bincode::serialize(&client_command).unwrap();
-                        // first write the buffer size
-                        let length = serialized.len() as u32;
-                        message.write_u32::<BigEndian>(length).unwrap();
-                        // append the actual payload
-                        message.extend_from_slice(&serialized);
+                if let Ok(client_command) = maybe_client_command {
+                    let mut message = Vec::new();
+                    let serialized = bincode::serialize(&client_command).unwrap();
+                    // first write the buffer size
+                    let length = serialized.len() as u32;
+                    message.write_u32::<BigEndian>(length).unwrap();
+                    // append the actual payload
+                    message.extend_from_slice(&serialized);
 
-                        // then write the buffer
-                        if let Err(e) = stream.write_all(&message).await {
-                            error!("Failed to send to server: {:?}", e);
-                        }
+                    // then write the buffer
+                    if let Err(e) = stream.write_all(&message).await {
+                        error!("Failed to send to server: {:?}", e);
                     }
-                    Err(_) => {}
                 }
             },
 
@@ -71,7 +67,7 @@ async fn handle_server(
                 match maybe_length_buf {
                     Ok(_) => {
                         // first read the buffer size
-                        let length = (&length_buf[..]).read_u32::<BigEndian>().unwrap() as u32;
+                        let length = (&length_buf[..]).read_u32::<BigEndian>().unwrap();
 
                         // then read the buffer
                         let mut msg_buf = vec![0; length as usize];

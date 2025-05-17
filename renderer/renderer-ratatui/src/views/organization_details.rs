@@ -68,8 +68,8 @@ pub fn draw_employee_details(
     rect: &Rect,
     current_week: i32,
     employee_snapshot: &EmployeeSnapshot,
-    pets_snapshot: &Vec<AnimalSnapshot>,
-    children_snapshot: &Vec<HumanSnapshot>,
+    pets_snapshot: &[AnimalSnapshot],
+    children_snapshot: &[HumanSnapshot],
 ) {
     let mut lines = vec![
         format!("Name: {}", employee_snapshot.name),

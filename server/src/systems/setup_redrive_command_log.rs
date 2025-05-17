@@ -22,7 +22,7 @@ pub fn setup_redrive_command_log(sender: Res<FanOutClientCommandSender>) {
     };
 
     let reader = BufReader::new(file);
-    for line in reader.lines().flatten() {
+    for line in reader.lines().map_while(Result::ok) {
         if let Ok(logged) = serde_json::from_str::<LoggedCommand>(&line) {
             let _ = sender
                 .tx_fan_out_client_commands
