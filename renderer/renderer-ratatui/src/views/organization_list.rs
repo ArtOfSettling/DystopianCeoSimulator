@@ -33,7 +33,7 @@ pub fn render_organization_list(
 pub fn render_organizations(
     frame: &mut Frame,
     rect: &Rect,
-    org_snapshots: &Vec<OrganizationSnapshot>,
+    org_snapshots: &[OrganizationSnapshot],
     selected_index: usize,
 ) {
     use ratatui::widgets::{List, ListItem, ListState};
@@ -68,7 +68,7 @@ pub fn render_organization_summary(
     rect: &Rect,
     org_snapshot: &OrganizationSnapshot,
 ) {
-    let lines = vec![
+    let lines = [
         format!("Org Name: {}", org_snapshot.name),
         format!(
             "VP: {}",

@@ -10,6 +10,8 @@ use shared::{
 use std::collections::HashMap;
 use uuid::Uuid;
 
+#[allow(clippy::type_complexity)]
+#[allow(clippy::too_many_arguments)]
 pub fn process_broadcast_world_state(
     mut needs_broadcast: ResMut<NeedsWorldBroadcast>,
     company: Res<Company>,
@@ -55,7 +57,7 @@ pub fn process_broadcast_world_state(
             role: employed.role.clone(),
             level: lvl.0,
             entity_type: type_.0.clone(),
-            organization_id: Some(employed.owner_id.clone()),
+            organization_id: Some(employed.owner_id),
             week_of_birth: week_of_birth.0,
             children_ids: entity_query
                 .iter()

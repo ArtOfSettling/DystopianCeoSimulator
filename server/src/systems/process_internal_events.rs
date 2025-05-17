@@ -9,6 +9,7 @@ use shared::{
 };
 use tracing::info;
 
+#[allow(clippy::type_complexity)]
 pub fn process_internal_events(
     world: &mut World,
     player_query: &mut QueryState<(

@@ -81,7 +81,7 @@ pub fn setup_world_state(mut commands: Commands) {
         Owner {
             owner_id: Some(alice_id),
         },
-        WeekOfBirth(starting_week.saturating_sub(1 * 52 + 1 * 4 + 1)), // 1 year old
+        WeekOfBirth(starting_week.saturating_sub(52 + 4 + 1)), // 1 year old
     ));
 
     info!("spawning employees of Red Division");

@@ -20,7 +20,7 @@ pub fn render(route: &Route, game_state_snapshot: &GameStateSnapshot, frame: &mu
     let financial_area = outer_chunks[1];
     let tooltip_area = outer_chunks[2];
 
-    render_financial_summary(frame, financial_area, &game_state_snapshot);
+    render_financial_summary(frame, financial_area, game_state_snapshot);
     render_tooltip(frame, tooltip_area, route);
 
     match route {
@@ -38,7 +38,7 @@ fn render_financial_summary(
     rect: Rect,
     game_state_snapshot: &GameStateSnapshot,
 ) {
-    let lines = vec![
+    let lines = [
         format!("Week: {}", game_state_snapshot.week),
         format!("Cash: ${}", game_state_snapshot.financials.actual_cash),
         format!(

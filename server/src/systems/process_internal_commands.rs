@@ -6,6 +6,7 @@ use shared::components::InternalEntity;
 use shared::{Money, Player, Reputation, Week};
 use tracing::info;
 
+#[allow(clippy::type_complexity)]
 pub fn process_internal_commands(
     mut commands: Commands,
     mut needs_broadcast: ResMut<NeedsWorldBroadcast>,

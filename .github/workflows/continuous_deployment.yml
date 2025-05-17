@@ -1,0 +1,38 @@
+name: Build, Lint, Format & Release
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  lint-and-format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Check formatting
+        run: cargo fmt -- --check
+      - name: Run clippy
+        run: cargo clippy -- -D warnings
+
+  build:
+    needs: lint-and-format
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Build release
+        run: cargo build --release
