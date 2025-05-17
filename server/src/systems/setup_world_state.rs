@@ -1,11 +1,22 @@
 use bevy::prelude::Commands;
-use shared::{CatBreed, Company, DogBreed, Employed, EmployeeFlag, EmployeeFlags, EntityType, Financials, HorseBreed, InternalEntity, Level, LizardBreed, Money, Name, OrgRole, Organization, Owner, Player, Productivity, PublicOpinion, Reputation, Salary, Satisfaction, Type, Week, WeekOfBirth};
+use shared::{
+    CatBreed, Company, DogBreed, Employed, EmployeeFlag, EmployeeFlags, EntityType, Financials,
+    HorseBreed, InternalEntity, Level, LizardBreed, Money, Name, OrgInitiative, OrgRole,
+    Organization, Owner, Player, Productivity, PublicOpinion, Reputation, Salary, Satisfaction,
+    Type, Week, WeekOfBirth,
+};
 use tracing::info;
 use uuid::Uuid;
 
 pub fn setup_world_state(mut commands: Commands) {
     info!("spawning player");
-    commands.spawn((Player, Money(1_000_000), Reputation(50), PublicOpinion(50), Week(1)));
+    commands.spawn((
+        Player,
+        Money(1_000_000),
+        Reputation(50),
+        PublicOpinion(50),
+        Week(1),
+    ));
 
     info!("spawning organizations");
     let org1_id = Uuid::from_u128(1);
@@ -18,6 +29,14 @@ pub fn setup_world_state(mut commands: Commands) {
             id: org1_id,
             name: "Red Division".into(),
             vp: Some(Uuid::from_u128(101)),
+            initiatives: vec![
+                OrgInitiative::Marketing {
+                    weeks_remaining: 52,
+                },
+                OrgInitiative::RnD {
+                    weeks_remaining: 29,
+                },
+            ],
             financials: Financials {
                 this_weeks_income: 0,
                 this_weeks_expenses: 0,
@@ -34,6 +53,9 @@ pub fn setup_world_state(mut commands: Commands) {
             id: org2_id,
             name: "Blue Division".into(),
             vp: Some(Uuid::from_u128(201)),
+            initiatives: vec![OrgInitiative::Training {
+                weeks_remaining: 11,
+            }],
             financials: Financials {
                 this_weeks_income: 0,
                 this_weeks_expenses: 0,

@@ -5,7 +5,7 @@ use bevy::prelude::{Entity, QueryState, Res, ResMut, Without, World};
 use shared::components::InternalEntity;
 use shared::{
     Company, Employed, EmployeeFlags, InternalEvent, Level, Money, Name, OrgRole, Organization,
-    Player, Productivity, Reputation, Salary, Satisfaction, Week,
+    Player, Productivity, PublicOpinion, Reputation, Salary, Satisfaction, Week,
 };
 use tracing::info;
 
@@ -29,7 +29,7 @@ pub fn process_internal_events(
         &mut Satisfaction,
     )>,
     entity_query: &mut QueryState<(Entity, &mut InternalEntity), Without<Employed>>,
-    organizations: &mut QueryState<&mut Organization>,
+    organizations: &mut QueryState<(&mut Organization, &mut Reputation, &mut PublicOpinion)>,
     params: &mut SystemState<(
         ResMut<Company>,
         ResMut<NeedsWorldBroadcast>,
@@ -127,7 +127,7 @@ pub fn process_internal_events(
             }
 
             InternalEvent::RemoveOrgVp { organization_id } => {
-                for mut org in organizations.iter_mut(world) {
+                for (mut org, _, _) in organizations.iter_mut(world) {
                     if org.id == organization_id {
                         org.vp = None;
                     }
@@ -145,7 +145,7 @@ pub fn process_internal_events(
             } => {
                 // Replace the existing vp
                 let mut vp_to_remove = None;
-                for mut org in organizations.iter_mut(world) {
+                for (mut org, _, _) in organizations.iter_mut(world) {
                     if org.id == organization_id {
                         vp_to_remove = org.vp;
                         org.vp = Some(employee_id);
@@ -176,9 +176,35 @@ pub fn process_internal_events(
                 organization_id,
                 financials,
             } => {
-                for mut org in organizations.iter_mut(world) {
+                for (mut org, _, _) in organizations.iter_mut(world) {
                     if org.id == organization_id {
                         org.financials = financials.clone();
+                        break;
+                    }
+                }
+            }
+
+            InternalEvent::SetOrgInitiatives {
+                organization_id,
+                initiatives,
+            } => {
+                for (mut org, _, _) in organizations.iter_mut(world) {
+                    if org.id == organization_id {
+                        org.initiatives = initiatives.clone();
+                        break;
+                    }
+                }
+            }
+
+            InternalEvent::SetOrgPublicOpinion {
+                organization_id,
+                reputation_delta,
+                public_opinion_delta,
+            } => {
+                for (org, mut reputation, mut public_opinion) in organizations.iter_mut(world) {
+                    if org.id == organization_id {
+                        reputation.0 += reputation_delta;
+                        public_opinion.0 += public_opinion_delta;
                         break;
                     }
                 }

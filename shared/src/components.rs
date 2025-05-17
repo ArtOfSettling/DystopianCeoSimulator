@@ -85,7 +85,15 @@ pub struct Organization {
     pub id: Uuid,
     pub name: String,
     pub vp: Option<Uuid>,
+    pub initiatives: Vec<OrgInitiative>,
     pub financials: Financials,
+}
+
+#[derive(Component, Clone, Debug, Serialize, Deserialize)]
+pub enum OrgInitiative {
+    Marketing { weeks_remaining: u32 },
+    Training { weeks_remaining: u32 },
+    RnD { weeks_remaining: u32 },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

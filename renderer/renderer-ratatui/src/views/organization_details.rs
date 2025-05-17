@@ -51,7 +51,11 @@ pub fn draw_employee_list(
     state.select(Some(selected_index));
 
     let list = List::new(items)
-        .block(Block::default().title(format!("{} Employees", org_snapshot.name)).borders(Borders::ALL))
+        .block(
+            Block::default()
+                .title(format!("{} Employees", org_snapshot.name))
+                .borders(Borders::ALL),
+        )
         .highlight_style(
             Style::default()
                 .bg(Color::Blue)
