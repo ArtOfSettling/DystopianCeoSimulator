@@ -90,7 +90,7 @@ fn render_financial_summary(
 
 fn render_tooltip(frame: &mut Frame, rect: Rect, route: &Route) {
     let text = match route {
-        Route::OrganizationList { .. } => "↑↓ to select | → to view | [q] Quit",
+        Route::OrganizationList { .. } => "↑↓ to select | → to view | [Space] Wait a week | [q] Quit",
         Route::OrganizationView { data } => match data.tab {
             OrganizationTab::Detail => {
                 "← Back to List | ↑↓ Navigate | [Tab] Change Tab | [f] Fire | [r] Raise | [p] Promote | [q] Quit"
