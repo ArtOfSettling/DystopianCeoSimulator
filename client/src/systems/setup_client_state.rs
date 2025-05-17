@@ -5,6 +5,9 @@ pub fn setup_world_state(mut commands: Commands) {
     commands.insert_resource(GameStateSnapshot {
         week: 1,
         reputation: 0,
+        public_opinion: 0,
+        company_reputation: 0,
+        company_public_opinion: 0,
         financials: Financials {
             this_weeks_income: 0,
             this_weeks_expenses: 0,

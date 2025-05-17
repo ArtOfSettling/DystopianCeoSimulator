@@ -12,14 +12,17 @@ pub fn render(route: &Route, game_state_snapshot: &GameStateSnapshot, frame: &mu
         .constraints([
             Constraint::Min(0),
             Constraint::Length(3),
+            Constraint::Length(3),
             Constraint::Length(1),
         ])
         .split(frame.area());
 
     let main_area = outer_chunks[0];
-    let financial_area = outer_chunks[1];
-    let tooltip_area = outer_chunks[2];
+    let vitals_area = outer_chunks[1];
+    let financial_area = outer_chunks[2];
+    let tooltip_area = outer_chunks[3];
 
+    render_vitals_summary(frame, vitals_area, game_state_snapshot);
     render_financial_summary(frame, financial_area, game_state_snapshot);
     render_tooltip(frame, tooltip_area, route);
 
@@ -33,13 +36,34 @@ pub fn render(route: &Route, game_state_snapshot: &GameStateSnapshot, frame: &mu
     }
 }
 
-fn render_financial_summary(
+fn render_vitals_summary(
     frame: &mut Frame,
     rect: Rect,
     game_state_snapshot: &GameStateSnapshot,
 ) {
     let lines = [
         format!("Week: {}", game_state_snapshot.week),
+        format!("CEO Public Opinion: {}", game_state_snapshot.public_opinion),
+        format!("Company Public Opinion: {}", game_state_snapshot.public_opinion),
+        format!("CEO Reputation: {}", game_state_snapshot.reputation),
+        format!("Company Reputation: {}", game_state_snapshot.reputation),
+    ];
+
+    let block = Block::default().title("Vitals").borders(Borders::ALL);
+
+    let paragraph = Paragraph::new(lines.join(" | "))
+        .block(block)
+        .wrap(Wrap { trim: true });
+
+    frame.render_widget(paragraph, rect);
+}
+
+fn render_financial_summary(
+    frame: &mut Frame,
+    rect: Rect,
+    game_state_snapshot: &GameStateSnapshot,
+) {
+    let lines = [
         format!("Cash: ${}", game_state_snapshot.financials.actual_cash),
         format!(
             "Income: ${}",

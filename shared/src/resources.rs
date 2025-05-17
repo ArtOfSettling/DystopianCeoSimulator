@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 #[derive(Resource)]
 pub struct Company {
+    pub reputation: i32,
     pub public_opinion: i32,
     pub financials: Financials,
 }

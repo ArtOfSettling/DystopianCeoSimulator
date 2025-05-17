@@ -75,6 +75,9 @@ pub enum UnemployedSnapshot {
 pub struct GameStateSnapshot {
     pub week: u32,
     pub reputation: i32,
+    pub public_opinion: i32,
+    pub company_reputation: i32,
+    pub company_public_opinion: i32,
     pub financials: Financials,
     pub organizations: Vec<OrganizationSnapshot>,
     pub humans: Vec<HumanSnapshot>,
@@ -89,6 +92,8 @@ pub struct OrganizationSnapshot {
     pub vp: Option<Uuid>,
     pub employees: Vec<EmployeeSnapshot>,
     pub financials: Financials,
+    pub reputation: i32,
+    pub public_opinion: i32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

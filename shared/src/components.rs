@@ -9,6 +9,9 @@ pub struct Player;
 pub struct Money(pub i32);
 
 #[derive(Component, Clone, Debug, Serialize, Deserialize)]
+pub struct PublicOpinion(pub i32);
+
+#[derive(Component, Clone, Debug, Serialize, Deserialize)]
 pub struct Reputation(pub i32);
 
 #[derive(Component, Clone, Debug, Serialize, Deserialize)]
