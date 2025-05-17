@@ -1,114 +1,92 @@
+mod server_guard;
+
+use crate::server_guard::ServerGuard;
 use std::process::Stdio;
-use tokio::io::AsyncBufReadExt;
-use tokio::process::Command;
+use tokio::net::TcpStream;
+use tokio::process::{Child, Command};
+use tokio::time::{Duration, sleep, timeout};
 use tracing::{error, info};
 use tracing_appender::non_blocking::WorkerGuard;
+
+async fn is_server_running(port: u16) -> bool {
+    TcpStream::connect(("127.0.0.1", port)).await.is_ok()
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let _guard = setup_logging();
-
     info!("Launcher starting...");
 
-    let server_handle = tokio::spawn(launch_server());
+    let port = 5555;
+    let mut server_guard = if is_server_running(port).await {
+        info!("Existing server detected, skipping spawn.");
+        ServerGuard::external()
+    } else {
+        info!("No running server detected, spawning new server process.");
+        ServerGuard::new("SERVER_PATH", "target/debug/server").await?
+    };
 
-    let client_handle = tokio::spawn(launch_client());
+    if !wait_for_server_ready(port, 50).await {
+        error!("Server failed to become ready in time.");
+        if let Err(e) = server_guard.shutdown().await {
+            error!("Failed to shutdown server: {}", e);
+            return Err(e);
+        }
+        return Ok(());
+    }
+
+    info!("Server is ready. Launching client...");
+
+    let mut client = spawn_foreground_process("CLIENT_PATH", "target/debug/client").await?;
 
     tokio::select! {
-        result = client_handle => {
-            match result {
-                Ok(status) => match status {
-                    Ok(_) => info!("Client exited gracefully. Shutting down launcher."),
-                    Err(e) => error!("Client process failed: {:?}", e),
-                },
-                Err(e) => error!("Client task panicked: {:?}", e),
+        status = client.wait() => {
+            match status {
+                Ok(exit) => info!("Client exited with: {}", exit),
+                Err(e) => error!("Client process wait failed: {}", e),
             }
         }
-        server_result = server_handle => {
-            if let Err(e) = server_result {
-                error!("Server process encountered an error: {:?}", e);
-            } else {
-                info!("Server process exited unexpectedly.");
-            }
+        _ = tokio::signal::ctrl_c() => {
+            info!("Received Ctrl+C");
         }
     }
 
-    info!("Launcher shutting down.");
+    info!("Shutting down server...");
+    if let Err(e) = server_guard.shutdown().await {
+        error!("Failed to shutdown server: {}", e);
+        return Err(e);
+    }
+    info!("Launcher exiting.");
     Ok(())
 }
 
-async fn launch_server() -> anyhow::Result<()> {
-    info!("Starting the server process...");
-
-    let server_path =
-        std::env::var("SERVER_PATH").unwrap_or_else(|_| "target/debug/server".to_string());
-
-    let mut server_process = Command::new(server_path)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("Failed to start server process");
-
-    if let Some(stdout) = server_process.stdout.take() {
-        let mut reader = tokio::io::BufReader::new(stdout).lines();
-        tokio::spawn(async move {
-            while let Ok(Some(line)) = reader.next_line().await {
-                info!("Server: {}", line);
-            }
-        });
+async fn wait_for_server_ready(port: u16, max_retries: u32) -> bool {
+    for _ in 0..max_retries {
+        if timeout(
+            Duration::from_secs(1),
+            TcpStream::connect(("127.0.0.1", port)),
+        )
+        .await
+        .is_ok()
+        {
+            return true;
+        }
+        sleep(Duration::from_millis(200)).await;
     }
-
-    match server_process.wait().await {
-        Ok(status) if status.success() => {
-            info!("Server process exited successfully.");
-            Ok(())
-        }
-        Ok(status) => {
-            error!("Server process exited with non-zero status: {}", status);
-            Err(anyhow::anyhow!("Server process failed"))
-        }
-        Err(e) => {
-            error!("Failed to wait on server process: {:?}", e);
-            Err(e.into())
-        }
-    }
+    false
 }
 
-async fn launch_client() -> anyhow::Result<()> {
-    info!("Starting the client process...");
+async fn spawn_foreground_process(env_var: &str, default_path: &str) -> anyhow::Result<Child> {
+    let path = std::env::var(env_var).unwrap_or_else(|_| default_path.to_string());
 
-    let client_path =
-        std::env::var("CLIENT_PATH").unwrap_or_else(|_| "target/debug/client".to_string());
-
-    let mut client_process = Command::new(client_path)
+    info!("Spawning foreground process: {}", path);
+    let child = Command::new(path)
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .spawn()
-        .expect("Failed to start client process");
+        .map_err(|e| anyhow::anyhow!("Failed to spawn foreground process: {}", e))?;
 
-    if let Some(stdout) = client_process.stdout.take() {
-        let mut reader = tokio::io::BufReader::new(stdout).lines();
-        tokio::spawn(async move {
-            while let Ok(Some(line)) = reader.next_line().await {
-                info!("Client: {}", line);
-            }
-        });
-    }
-
-    match client_process.wait().await {
-        Ok(status) if status.success() => {
-            info!("Client process exited successfully.");
-            Ok(())
-        }
-        Ok(status) => {
-            error!("Client process exited with non-zero status: {}", status);
-            Err(anyhow::anyhow!("Client process failed"))
-        }
-        Err(e) => {
-            error!("Failed to wait on client process: {:?}", e);
-            Err(e.into())
-        }
-    }
+    Ok(child)
 }
 
 fn setup_logging() -> WorkerGuard {

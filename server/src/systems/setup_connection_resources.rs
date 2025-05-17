@@ -11,6 +11,7 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use futures::{AsyncWriteExt, FutureExt};
 use shared::components::InternalEntity;
 use shared::{ClientCommand, ServerEvent};
+use std::net::SocketAddr;
 use std::time::Duration;
 use tracing::{error, info, instrument};
 use uuid::Uuid;
@@ -61,32 +62,39 @@ async fn setup_connection_handler(
     tx_internal_server_commands: Sender<InternalCommand>,
 ) {
     info!("Spinning up server");
-    let listener = TcpListener::bind("127.0.0.1:12345").await.unwrap();
+    let addr = SocketAddr::from(([127, 0, 0, 1], 12345));
+    match TcpListener::bind(addr).await {
+        Ok(listener) => {
+            info!("Server listening on 127.0.0.1:12345");
+            loop {
+                if let Ok((stream, addr)) = listener.accept().await {
+                    info!("New connection from: {}", addr);
 
-    info!("Server listening on 127.0.0.1:12345");
-    loop {
-        if let Ok((stream, addr)) = listener.accept().await {
-            info!("New connection from: {}", addr);
+                    let addr_str = addr.to_string();
+                    let uuid = Uuid::new_v5(&Uuid::NAMESPACE_DNS, addr_str.as_bytes());
+                    tx_internal_server_commands
+                        .send(PlayerConnected(InternalEntity { id: uuid }))
+                        .await
+                        .unwrap();
 
-            let addr_str = addr.to_string();
-            let uuid = Uuid::new_v5(&Uuid::NAMESPACE_DNS, addr_str.as_bytes());
-            tx_internal_server_commands
-                .send(PlayerConnected(InternalEntity { id: uuid }))
-                .await
-                .unwrap();
+                    let tx = client_command_sender.clone();
+                    let rx = server_event_receiver.clone();
 
-            let tx = client_command_sender.clone();
-            let rx = server_event_receiver.clone();
+                    let cloned_tx_internal_server_commands = tx_internal_server_commands.clone();
+                    IoTaskPool::get()
+                        .spawn(async move {
+                            handle_client(uuid, stream, tx, cloned_tx_internal_server_commands, rx)
+                                .await
+                        })
+                        .detach();
+                }
 
-            let cloned_tx_internal_server_commands = tx_internal_server_commands.clone();
-            IoTaskPool::get()
-                .spawn(async move {
-                    handle_client(uuid, stream, tx, cloned_tx_internal_server_commands, rx).await
-                })
-                .detach();
+                sleep(Duration::from_millis(SLEEP_TIME_FOR_TARGET_TICK)).await;
+            }
         }
-
-        sleep(Duration::from_millis(SLEEP_TIME_FOR_TARGET_TICK)).await;
+        Err(e) => {
+            error!("Could not bind to port {}: {:?}", addr, e);
+        }
     }
 }
 
@@ -144,7 +152,15 @@ async fn handle_client(
                         tx_client_commands.send((uuid, client_command)).await.expect("Failed to forward command");
                     }
                     Err(e) => {
-                        error!("Error reading from server: {:?}", e);
+                        error!("Client disconnected or error reading from stream: {:?}", e);
+
+                        // Send PlayerDisconnected internal command before exiting
+                        if let Err(e) = tx_internal_server_commands.send(
+                            InternalCommand::PlayerDisconnected(InternalEntity { id: uuid })
+                        ).await {
+                            error!("Failed to send PlayerDisconnected command: {:?}", e);
+                        }
+
                         break;
                     }
                 }

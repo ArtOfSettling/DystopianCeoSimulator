@@ -1,5 +1,6 @@
 mod cli;
 mod internal_commands;
+mod plugins;
 mod systems;
 
 use crate::systems::{
@@ -45,6 +46,7 @@ fn main() -> anyhow::Result<()> {
 
     App::new()
         .add_plugins(MinimalPlugins.set(ScheduleRunnerPlugin::run_loop(Duration::from_millis(10))))
+        .add_plugins(AsyncStdReadySignalPlugin { port: 5555 })
         .insert_resource(Time::<Fixed>::from_hz(128.0))
         .insert_resource(NeedsWorldBroadcast::default())
         .insert_resource(NeedsStateUpdate::default())
@@ -119,6 +121,7 @@ fn setup_logging() -> WorkerGuard {
     guard
 }
 
+use crate::plugins::AsyncStdReadySignalPlugin;
 use crate::systems::process_clear_needs_state_update::process_clear_needs_state_update;
 use crate::systems::process_company_updates::process_company_updates;
 use crate::systems::process_organization_updates::process_organization_updates;
