@@ -81,7 +81,7 @@ pub fn draw_employee_details(
         format!("Role: {:?}", employee_snapshot.role),
         format!("Level: {}", employee_snapshot.level),
         format!("Satisfaction: {}", employee_snapshot.satisfaction),
-        format!("Salary: ${}", employee_snapshot.salary),
+        format!("Salary (p/w): ${}", employee_snapshot.salary),
     ];
 
     // Children
