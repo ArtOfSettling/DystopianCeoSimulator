@@ -2,7 +2,7 @@ use crate::navigation::{NavigationAction, NavigationStack};
 use crate::routes::{OrganizationList, OrganizationTab, OrganizationView, Route};
 use bevy::prelude::ResMut;
 use input_api::PlayerInputAction;
-use shared::{GameStateSnapshot, PendingPlayerAction, PlayerAction};
+use shared::{GameStateSnapshot, PendingPlayerAction, PlayerAction, UnemployedSnapshot};
 
 fn try_switch_tab(current: &Route) -> Option<Route> {
     match current {
@@ -106,62 +106,93 @@ impl InputHandler for OrganizationView {
         action: PlayerInputAction,
         game_state_snapshot: &GameStateSnapshot,
     ) -> Option<PlayerAction> {
-        match action {
-            PlayerInputAction::DoNothing => Some(PlayerAction::DoNothing),
-            PlayerInputAction::MenuDown => {
-                let employee_count = game_state_snapshot
-                    .organizations
-                    .iter()
-                    .find(|organization| organization.id == self.organization_id)
-                    .map(|organization| organization.employees.len())
-                    .unwrap_or(0);
-                self.selected_index = (self.selected_index + 1).min(employee_count - 1);
-                None
-            }
-            PlayerInputAction::MenuUp => {
-                self.selected_index = self.selected_index.saturating_sub(1);
-                None
-            }
-            PlayerInputAction::LaunchPRCampaign => Some(PlayerAction::LaunchPRCampaign),
-            PlayerInputAction::SelectEmployeeForPromotionToVP => {
-                let org_snapshot = game_state_snapshot
-                    .organizations
-                    .iter()
-                    .find(|org| org.id == self.organization_id)
-                    .unwrap();
-                let employee = &org_snapshot.employees[self.selected_index];
-                Some(PlayerAction::PromoteToVp {
-                    organization_id: self.organization_id,
-                    employee_id: employee.id,
-                })
-            }
+        match self.tab {
+            OrganizationTab::Detail => {
+                match action {
+                    PlayerInputAction::MenuDown => {
+                        let employee_count = game_state_snapshot
+                            .organizations
+                            .iter()
+                            .find(|organization| organization.id == self.organization_id)
+                            .map(|organization| organization.employees.len())
+                            .unwrap_or(0);
+                        self.selected_index = (self.selected_index + 1).min(employee_count - 1);
+                        None
+                    }
+                    PlayerInputAction::MenuUp => {
+                        self.selected_index = self.selected_index.saturating_sub(1);
+                        None
+                    }
+                    PlayerInputAction::SelectEmployeeForPromotionToVP => {
+                        let org_snapshot = game_state_snapshot
+                            .organizations
+                            .iter()
+                            .find(|org| org.id == self.organization_id)
+                            .unwrap();
+                        let employee = &org_snapshot.employees[self.selected_index];
+                        Some(PlayerAction::PromoteToVp {
+                            organization_id: self.organization_id,
+                            employee_id: employee.id,
+                        })
+                    }
 
-            PlayerInputAction::SelectEmployeeForRaise => {
-                let org_snapshot = game_state_snapshot
-                    .organizations
-                    .iter()
-                    .find(|org| org.id == self.organization_id)
-                    .unwrap();
-                let employee = &org_snapshot.employees[self.selected_index];
-                Some(PlayerAction::GiveRaise {
-                    employee_id: employee.id,
-                    amount: 1_000,
-                })
-            }
+                    PlayerInputAction::SelectEmployeeForRaise => {
+                        let org_snapshot = game_state_snapshot
+                            .organizations
+                            .iter()
+                            .find(|org| org.id == self.organization_id)
+                            .unwrap();
+                        let employee = &org_snapshot.employees[self.selected_index];
+                        Some(PlayerAction::GiveRaise {
+                            employee_id: employee.id,
+                            amount: 1_000,
+                        })
+                    }
 
-            PlayerInputAction::SelectEmployeeToFire => {
-                let org_snapshot = game_state_snapshot
-                    .organizations
-                    .iter()
-                    .find(|org| org.id == self.organization_id)
-                    .unwrap();
-                let employee = &org_snapshot.employees[self.selected_index];
-                Some(PlayerAction::FireEmployee {
-                    employee_id: employee.id,
-                })
-            }
+                    PlayerInputAction::SelectEmployeeToFire => {
+                        let org_snapshot = game_state_snapshot
+                            .organizations
+                            .iter()
+                            .find(|org| org.id == self.organization_id)
+                            .unwrap();
+                        let employee = &org_snapshot.employees[self.selected_index];
+                        Some(PlayerAction::FireEmployee {
+                            employee_id: employee.id,
+                        })
+                    }
 
-            _ => None,
+                    _ => None,
+                }
+            }
+            OrganizationTab::Hiring => {
+                match action {
+                    PlayerInputAction::MenuDown => {
+                        let unemployed_count = game_state_snapshot
+                            .unemployed
+                            .len();
+                        self.selected_index = (self.selected_index + 1).min(unemployed_count - 1);
+                        None
+                    }
+                    PlayerInputAction::MenuUp => {
+                        self.selected_index = self.selected_index.saturating_sub(1);
+                        None
+                    }
+
+                    PlayerInputAction::SelectEmployeeToHire => {
+                        let employee_id = match &game_state_snapshot.unemployed[self.selected_index] {
+                            UnemployedSnapshot::UnemployedAnimalSnapshot(animal_snapshot) => animal_snapshot.id,
+                            UnemployedSnapshot::UnemployedHumanSnapshot(human_snapshot) => human_snapshot.id,
+                        };
+
+                        Some(PlayerAction::HireEmployee {
+                            employee_id,
+                            organization_id: self.organization_id,
+                        })
+                    }
+
+                    _ => None,
+                }
+            }
         }
     }
 }
