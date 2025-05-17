@@ -22,7 +22,7 @@ pub fn setup_redrive_event_log(sender: Res<FanOutEventSender>) {
     };
 
     let reader = BufReader::new(file);
-    for line in reader.lines().flatten() {
+    for line in reader.lines().map_while(Result::ok) {
         if let Ok(logged) = serde_json::from_str::<LoggedEvent>(&line) {
             let _ = sender.tx_fan_out_events.try_send(logged.event);
         }
