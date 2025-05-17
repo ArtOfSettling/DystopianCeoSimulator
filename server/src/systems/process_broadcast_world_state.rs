@@ -1,12 +1,7 @@
 use crate::NeedsWorldBroadcast;
 use crate::systems::ServerEventSender;
 use bevy::prelude::{Query, Res, ResMut, Without};
-use shared::{
-    AnimalSnapshot, Company, Employed, EmployeeSnapshot, EntityType, GameStateSnapshot,
-    HumanSnapshot, InternalEntity, Level, Money, Name, Organization, OrganizationSnapshot, Owner,
-    Player, Reputation, Salary, Satisfaction, ServerEvent, Type, UnemployedSnapshot, Week,
-    WeekOfBirth,
-};
+use shared::{AnimalSnapshot, Company, Employed, EmployeeSnapshot, EntityType, GameStateSnapshot, HumanSnapshot, InternalEntity, Level, Money, Name, Organization, OrganizationSnapshot, Owner, Player, PublicOpinion, Reputation, Salary, Satisfaction, ServerEvent, Type, UnemployedSnapshot, Week, WeekOfBirth};
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -15,9 +10,8 @@ use uuid::Uuid;
 pub fn process_broadcast_world_state(
     mut needs_broadcast: ResMut<NeedsWorldBroadcast>,
     company: Res<Company>,
-    query_rep: Query<&Reputation>,
-    query_player: Query<(&Player, &Money, &Reputation, &Week, Option<&InternalEntity>)>,
-    query_organizations: Query<&Organization>,
+    query_player: Query<(&Player, &Money, &Reputation, &PublicOpinion, &Week, Option<&InternalEntity>)>,
+    query_organizations: Query<(&Organization, &Reputation, &PublicOpinion)>,
     employee_query: Query<(
         &InternalEntity,
         &Name,
@@ -36,13 +30,13 @@ pub fn process_broadcast_world_state(
     server_event_sender: Res<ServerEventSender>,
 ) {
     // Only send if there's a connected player and we're due to broadcast
-    let (_, _, _, week, internal_entity) = query_player.single();
+    let (_, _, _, _, week, internal_entity) = query_player.single();
     if internal_entity.is_none() || !needs_broadcast.0 {
         return;
     }
     needs_broadcast.0 = false;
 
-    let reputation = query_rep.single().0;
+    let (_, _, reputation, public_opinion, _, _) = query_player.single();
 
     let mut org_map: HashMap<Uuid, Vec<EmployeeSnapshot>> = HashMap::new();
 
@@ -87,12 +81,14 @@ pub fn process_broadcast_world_state(
 
     let organizations = query_organizations
         .iter()
-        .map(|org| OrganizationSnapshot {
+        .map(|(org, reputation, public_opinion)| OrganizationSnapshot {
             id: org.id,
             name: org.name.clone(),
             vp: org.vp,
             employees: org_map.remove(&org.id).unwrap_or_default(),
             financials: org.financials.clone(),
+            reputation: reputation.0,
+            public_opinion: public_opinion.0,
         })
         .collect::<Vec<_>>();
 
@@ -143,7 +139,10 @@ pub fn process_broadcast_world_state(
     let snapshot = GameStateSnapshot {
         week: week.0,
         financials: company.financials.clone(),
-        reputation,
+        reputation: reputation.0,
+        public_opinion: public_opinion.0,
+        company_reputation: company.reputation,
+        company_public_opinion: company.public_opinion,
         organizations,
         humans,
         pets,

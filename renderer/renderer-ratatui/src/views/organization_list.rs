@@ -80,6 +80,8 @@ pub fn render_organization_summary(
                     .map_or("Unknown".to_string(), |e| e.name.clone())
             })
         ),
+        format!("Reputation: {}", org_snapshot.reputation),
+        format!("Public Opinion: {}", org_snapshot.public_opinion),
         format!("Employees: {}", org_snapshot.employees.len()),
         format!("Cash: ${}", org_snapshot.financials.actual_cash),
         format!("Income: ${}", org_snapshot.financials.this_weeks_income),

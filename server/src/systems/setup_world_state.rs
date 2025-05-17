@@ -1,15 +1,11 @@
 use bevy::prelude::Commands;
-use shared::{
-    CatBreed, Company, DogBreed, Employed, EmployeeFlag, EmployeeFlags, EntityType, Financials,
-    HorseBreed, InternalEntity, Level, LizardBreed, Money, Name, OrgRole, Organization, Owner,
-    Player, Productivity, Reputation, Salary, Satisfaction, Type, Week, WeekOfBirth,
-};
+use shared::{CatBreed, Company, DogBreed, Employed, EmployeeFlag, EmployeeFlags, EntityType, Financials, HorseBreed, InternalEntity, Level, LizardBreed, Money, Name, OrgRole, Organization, Owner, Player, Productivity, PublicOpinion, Reputation, Salary, Satisfaction, Type, Week, WeekOfBirth};
 use tracing::info;
 use uuid::Uuid;
 
 pub fn setup_world_state(mut commands: Commands) {
     info!("spawning player");
-    commands.spawn((Player, Money(1_000_000), Reputation(50), Week(1)));
+    commands.spawn((Player, Money(1_000_000), Reputation(50), PublicOpinion(50), Week(1)));
 
     info!("spawning organizations");
     let org1_id = Uuid::from_u128(1);
@@ -17,29 +13,37 @@ pub fn setup_world_state(mut commands: Commands) {
 
     let starting_week = 0i32;
 
-    commands.spawn(Organization {
-        id: org1_id,
-        name: "Red Division".into(),
-        vp: Some(Uuid::from_u128(101)),
-        financials: Financials {
-            this_weeks_income: 0,
-            this_weeks_expenses: 0,
-            this_weeks_net_profit: 0,
-            actual_cash: 256_227,
+    commands.spawn((
+        Organization {
+            id: org1_id,
+            name: "Red Division".into(),
+            vp: Some(Uuid::from_u128(101)),
+            financials: Financials {
+                this_weeks_income: 0,
+                this_weeks_expenses: 0,
+                this_weeks_net_profit: 0,
+                actual_cash: 256_227,
+            },
         },
-    });
+        Reputation(50),
+        PublicOpinion(50),
+    ));
 
-    commands.spawn(Organization {
-        id: org2_id,
-        name: "Blue Division".into(),
-        vp: Some(Uuid::from_u128(201)),
-        financials: Financials {
-            this_weeks_income: 0,
-            this_weeks_expenses: 0,
-            this_weeks_net_profit: 0,
-            actual_cash: 709_991,
+    commands.spawn((
+        Organization {
+            id: org2_id,
+            name: "Blue Division".into(),
+            vp: Some(Uuid::from_u128(201)),
+            financials: Financials {
+                this_weeks_income: 0,
+                this_weeks_expenses: 0,
+                this_weeks_net_profit: 0,
+                actual_cash: 709_991,
+            },
         },
-    });
+        Reputation(50),
+        PublicOpinion(50),
+    ));
 
     info!("spawning vp of Red Division");
     let alice_id = Uuid::from_u128(101);
@@ -229,6 +233,7 @@ pub fn setup_world_state(mut commands: Commands) {
     info!("spawning Company");
     commands.insert_resource(Company {
         public_opinion: 50,
+        reputation: 50,
         financials: Financials {
             this_weeks_income: 0,
             this_weeks_expenses: 0,
