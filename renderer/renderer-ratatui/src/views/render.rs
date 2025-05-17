@@ -36,15 +36,14 @@ pub fn render(route: &Route, game_state_snapshot: &GameStateSnapshot, frame: &mu
     }
 }
 
-fn render_vitals_summary(
-    frame: &mut Frame,
-    rect: Rect,
-    game_state_snapshot: &GameStateSnapshot,
-) {
+fn render_vitals_summary(frame: &mut Frame, rect: Rect, game_state_snapshot: &GameStateSnapshot) {
     let lines = [
         format!("Week: {}", game_state_snapshot.week),
         format!("CEO Public Opinion: {}", game_state_snapshot.public_opinion),
-        format!("Company Public Opinion: {}", game_state_snapshot.public_opinion),
+        format!(
+            "Company Public Opinion: {}",
+            game_state_snapshot.public_opinion
+        ),
         format!("CEO Reputation: {}", game_state_snapshot.reputation),
         format!("Company Reputation: {}", game_state_snapshot.reputation),
     ];
@@ -90,7 +89,9 @@ fn render_financial_summary(
 
 fn render_tooltip(frame: &mut Frame, rect: Rect, route: &Route) {
     let text = match route {
-        Route::OrganizationList { .. } => "↑↓ to select | → to view | [Space] Wait a week | [q] Quit",
+        Route::OrganizationList { .. } => {
+            "↑↓ to select | → to view | [Space] Wait a week | [q] Quit"
+        }
         Route::OrganizationView { data } => match data.tab {
             OrganizationTab::Detail => {
                 "← Back to List | ↑↓ Navigate | [Tab] Change Tab | [f] Fire | [r] Raise | [p] Promote | [q] Quit"

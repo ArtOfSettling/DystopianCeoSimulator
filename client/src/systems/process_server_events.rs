@@ -28,7 +28,8 @@ pub fn process_server_events(
             game_state_snapshot.week = rx_game_state_snapshot.week;
             game_state_snapshot.public_opinion = rx_game_state_snapshot.public_opinion;
             game_state_snapshot.reputation = rx_game_state_snapshot.reputation;
-            game_state_snapshot.company_public_opinion = rx_game_state_snapshot.company_public_opinion;
+            game_state_snapshot.company_public_opinion =
+                rx_game_state_snapshot.company_public_opinion;
             game_state_snapshot.company_reputation = rx_game_state_snapshot.company_reputation;
             game_state_snapshot.financials = rx_game_state_snapshot.financials;
             game_state_snapshot.organizations = rx_game_state_snapshot.organizations;

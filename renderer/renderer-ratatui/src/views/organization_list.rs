@@ -2,7 +2,7 @@ use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Block, Borders, Wrap};
 use ratatui::{Frame, widgets::Paragraph};
-use shared::{GameStateSnapshot, OrganizationSnapshot};
+use shared::{GameStateSnapshot, OrgInitiative, OrganizationSnapshot};
 
 pub fn render_organization_list(
     game_state_snapshot: &GameStateSnapshot,
@@ -68,7 +68,7 @@ pub fn render_organization_summary(
     rect: &Rect,
     org_snapshot: &OrganizationSnapshot,
 ) {
-    let lines = [
+    let mut lines = vec![
         format!("Org Name: {}", org_snapshot.name),
         format!(
             "VP: {}",
@@ -91,6 +91,24 @@ pub fn render_organization_summary(
             org_snapshot.financials.this_weeks_net_profit
         ),
     ];
+
+    if !org_snapshot.initiatives.is_empty() {
+        lines.push("Active Initiatives:".to_string());
+        for initiative in &org_snapshot.initiatives {
+            let description = match initiative {
+                OrgInitiative::Marketing { weeks_remaining } => {
+                    format!("• Marketing ({} weeks left)", weeks_remaining)
+                }
+                OrgInitiative::Training { weeks_remaining } => {
+                    format!("• Training ({} weeks left)", weeks_remaining)
+                }
+                OrgInitiative::RnD { weeks_remaining } => {
+                    format!("• R&D ({} weeks left)", weeks_remaining)
+                }
+            };
+            lines.push(description);
+        }
+    }
 
     let block = Block::default()
         .title("Organization Summary")

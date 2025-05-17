@@ -52,6 +52,15 @@ pub enum InternalEvent {
         organization_id: Uuid,
         financials: Financials,
     },
+    SetOrgInitiatives {
+        organization_id: Uuid,
+        initiatives: Vec<OrgInitiative>,
+    },
+    SetOrgPublicOpinion {
+        organization_id: Uuid,
+        reputation_delta: i32,
+        public_opinion_delta: i32,
+    },
     SetCompanyFinancials {
         financials: Financials,
     },
@@ -91,6 +100,7 @@ pub struct OrganizationSnapshot {
     pub name: String,
     pub vp: Option<Uuid>,
     pub employees: Vec<EmployeeSnapshot>,
+    pub initiatives: Vec<OrgInitiative>,
     pub financials: Financials,
     pub reputation: i32,
     pub public_opinion: i32,
