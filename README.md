@@ -40,8 +40,8 @@ cargo --version
 
 ### 2. Clone the repo
 ```bash
-git clone https://github.com/YOUR_USERNAME/YOUR_REPO.git
-cd YOUR_REPO
+git clone https://github.com/ArtOfSettling/DystopianCeoSimulator.git
+cd DystopianCeoSimulator
 ```
 
 ### 3. Build the full workspace

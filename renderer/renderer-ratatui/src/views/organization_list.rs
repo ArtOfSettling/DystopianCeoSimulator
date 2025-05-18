@@ -1,18 +1,17 @@
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::Span;
 use ratatui::widgets::{Block, Borders, Sparkline, Wrap};
-use ratatui::{Frame, widgets::Paragraph};
-use shared::{
-    GameStateSnapshot, HistoryStateSnapshot, OrgHistoryPoint, OrgHistorySnapshot, OrgInitiative,
-    OrganizationSnapshot,
-};
+use ratatui::{widgets::Paragraph, Frame};
+use renderer_api::{ClientGameState, ClientHistoryState};
+use shared::{HistoryPoint, Initiative, OrganizationHistory};
+use uuid::Uuid;
 
 pub fn render_organization_list(
-    game_state_snapshot: &GameStateSnapshot,
-    history_state_snapshot: &HistoryStateSnapshot,
+    client_game_state: &ClientGameState,
+    client_history_state: &ClientHistoryState,
     frame: &mut Frame,
     main_area: &Rect,
+    company_id: &Uuid,
     selected_index: &usize,
 ) {
     let chunks = Layout::default()
@@ -31,22 +30,27 @@ pub fn render_organization_list(
     let top_pane = detail_area[0];
     let bottom_pane = detail_area[1];
 
-    let organization = game_state_snapshot.organizations.get(*selected_index);
-    render_organizations(
-        frame,
-        &left_pane,
-        &game_state_snapshot.organizations,
-        *selected_index,
-    );
-    if let Some(organization) = organization {
-        let id = organization.id;
-        let history = history_state_snapshot
+    if let Some(organization_ids) = client_game_state
+        .ordered_organizations_of_company
+        .get(company_id)
+    {
+        render_organizations(
+            frame,
+            &left_pane,
+            client_game_state,
+            &organization_ids,
+            *selected_index,
+        );
+
+        let organization_id = &organization_ids[*selected_index];
+        render_organization_summary(frame, &top_pane, client_game_state, organization_id);
+        let history = client_history_state
+            .history_state
             .organizations
             .iter()
-            .find(|organization| organization.org_id == id);
-        render_organization_summary(frame, &top_pane, organization);
-        if let Some(history) = history {
-            render_history_graphs(frame, &bottom_pane, history);
+            .find(|(id, _organization)| *id == organization_id);
+        if let Some((_organization_id, organization_history)) = history {
+            render_history_graphs(frame, &bottom_pane, organization_history);
         }
     }
 }
@@ -54,12 +58,23 @@ pub fn render_organization_list(
 pub fn render_organizations(
     frame: &mut Frame,
     rect: &Rect,
-    org_snapshots: &[OrganizationSnapshot],
+    client_game_state: &ClientGameState,
+    organization_ids: &[Uuid],
     selected_index: usize,
 ) {
     use ratatui::widgets::{List, ListItem, ListState};
 
-    let items: Vec<ListItem> = org_snapshots
+    let organizations: Vec<&_> = organization_ids
+        .iter()
+        .map(|organization_id| {
+            client_game_state
+                .organizations
+                .get(organization_id)
+                .unwrap()
+        })
+        .collect();
+
+    let items: Vec<ListItem> = organizations
         .iter()
         .map(|org| ListItem::new(format!("Org: {}", org.name)))
         .collect();
@@ -87,47 +102,59 @@ pub fn render_organizations(
 pub fn render_organization_summary(
     frame: &mut Frame,
     rect: &Rect,
-    org_snapshot: &OrganizationSnapshot,
+    client_game_state: &ClientGameState,
+    organization_id: &Uuid,
 ) {
+    let organization = client_game_state
+        .organizations
+        .get(organization_id)
+        .unwrap();
     let mut lines = vec![
-        format!("Org Name: {}", org_snapshot.name),
+        format!("Org Name: {}", organization.name),
         format!(
             "VP: {}",
-            org_snapshot.vp.map_or("Vacant".to_string(), |id| {
-                org_snapshot
-                    .employees
-                    .iter()
-                    .find(|e| e.id == id)
-                    .map_or("Unknown".to_string(), |e| e.name.clone())
+            organization.vp.map_or("Vacant".to_string(), |id| {
+                if let Some(vp) = client_game_state.entities.get(&id) {
+                    vp.name.clone()
+                } else {
+                    "Unknown".to_string()
+                }
             })
         ),
         "Budget:".to_string(),
-        format!("• Marketing {} (p/w)", org_snapshot.budget.marketing),
-        format!("• Training {} (p/w)", org_snapshot.budget.training),
-        format!("• R&D {} (p/w)", org_snapshot.budget.rnd),
-        format!("Reputation: {}", org_snapshot.reputation),
-        format!("Public Opinion: {}", org_snapshot.public_opinion),
-        format!("Employees: {}", org_snapshot.employees.len()),
-        format!("Cash: ${}", org_snapshot.financials.actual_cash),
-        format!("Income: ${}", org_snapshot.financials.this_weeks_income),
-        format!("Expenses: ${}", org_snapshot.financials.this_weeks_expenses),
+        format!("• Marketing {} (p/w)", organization.budget.marketing),
+        format!("• Training {} (p/w)", organization.budget.training),
+        format!("• R&D {} (p/w)", organization.budget.rnd),
+        format!("Reputation: {}", organization.perception.reputation),
+        format!("Public Opinion: {}", organization.perception.public_opinion),
+        format!(
+            "Employees: {}",
+            client_game_state
+                .ordered_employees_of_organization
+                .get(&organization.id)
+                .map(|v| v.len())
+                .unwrap_or(0)
+        ),
+        format!("Cash: ${}", organization.financials.actual_cash),
+        format!("Income: ${}", organization.financials.this_weeks_income),
+        format!("Expenses: ${}", organization.financials.this_weeks_expenses),
         format!(
             "Net Profit: ${}",
-            org_snapshot.financials.this_weeks_net_profit
+            organization.financials.this_weeks_net_profit
         ),
     ];
 
-    if !org_snapshot.initiatives.is_empty() {
+    if !organization.initiatives.is_empty() {
         lines.push("Active Initiatives:".to_string());
-        for initiative in &org_snapshot.initiatives {
+        for initiative in &organization.initiatives {
             let description = match initiative {
-                OrgInitiative::Marketing { weeks_remaining } => {
+                Initiative::Marketing { weeks_remaining } => {
                     format!("• Marketing ({} weeks left)", weeks_remaining)
                 }
-                OrgInitiative::Training { weeks_remaining } => {
+                Initiative::Training { weeks_remaining } => {
                     format!("• Training ({} weeks left)", weeks_remaining)
                 }
-                OrgInitiative::RnD { weeks_remaining } => {
+                Initiative::RnD { weeks_remaining } => {
                     format!("• R&D ({} weeks left)", weeks_remaining)
                 }
             };
@@ -148,12 +175,11 @@ pub fn render_organization_summary(
 fn render_history_graphs(
     frame: &mut Frame,
     area: &Rect,
-    org_history_snapshot: &OrgHistorySnapshot,
+    organization_history: &OrganizationHistory,
 ) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints(vec![
-            Constraint::Length(1),
             Constraint::Length(2),
             Constraint::Length(2),
             Constraint::Length(2),
@@ -162,13 +188,8 @@ fn render_history_graphs(
         ])
         .split(*area);
 
-    frame.render_widget(
-        Paragraph::new(Span::raw(format!("Org: {}", org_history_snapshot.name))),
-        chunks[0],
-    );
-
-    let history = |f: fn(&OrgHistoryPoint) -> i32| -> Vec<u64> {
-        org_history_snapshot
+    let history = |f: fn(&HistoryPoint) -> i32| -> Vec<u64> {
+        organization_history
             .recent_history
             .iter()
             .map(f)
@@ -179,40 +200,40 @@ fn render_history_graphs(
     frame.render_widget(
         Sparkline::default()
             .block(Block::default().title("Net Profit"))
-            .data(&history(|h| h.net_profit))
+            .data(&history(|h| h.financials.this_weeks_net_profit))
             .style(Style::default().fg(Color::Green)),
-        chunks[1],
+        chunks[0],
     );
 
     frame.render_widget(
         Sparkline::default()
             .block(Block::default().title("Cash"))
-            .data(&history(|h| h.cash))
+            .data(&history(|h| h.financials.actual_cash))
             .style(Style::default().fg(Color::Yellow)),
-        chunks[2],
+        chunks[1],
     );
 
     frame.render_widget(
         Sparkline::default()
             .block(Block::default().title("Public Opinion"))
-            .data(&history(|h| h.public_opinion))
+            .data(&history(|h| h.perception.public_opinion as i32))
             .style(Style::default().fg(Color::Cyan)),
-        chunks[3],
+        chunks[2],
     );
 
     frame.render_widget(
         Sparkline::default()
             .block(Block::default().title("Reputation"))
-            .data(&history(|h| h.reputation))
+            .data(&history(|h| h.perception.reputation as i32))
             .style(Style::default().fg(Color::Magenta)),
-        chunks[4],
+        chunks[3],
     );
 
     frame.render_widget(
         Sparkline::default()
             .block(Block::default().title("Satisfaction"))
-            .data(&history(|h| h.avg_employee_satisfaction))
+            .data(&history(|h| h.avg_employee_satisfaction as i32))
             .style(Style::default().fg(Color::Blue)),
-        chunks[5],
+        chunks[4],
     );
 }

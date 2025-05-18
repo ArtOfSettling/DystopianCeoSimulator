@@ -1,18 +1,17 @@
 use crate::systems::FanOutClientCommandReceiver;
 use crate::{InternalEventSender, NeedsStateUpdate};
-use bevy::prelude::{Query, Res, ResMut, With, Without};
-use shared::{
-    ClientCommand, Employed, InternalEntity, InternalEvent, Name, PlayerAction, Salary,
-    Satisfaction,
-};
+use bevy::prelude::{Res, ResMut};
+use bevy::tasks::futures_lite::stream::or;
+use bevy::utils::HashMap;
+use shared::{ClientCommand, HistoryPoint, InternalEvent, OrganizationRole, PlayerAction, ServerGameState};
 use tracing::info;
+use uuid::Uuid;
 
 pub fn process_client_commands(
     channel: Res<FanOutClientCommandReceiver>,
     mut needs_state_update: ResMut<NeedsStateUpdate>,
     internal_event_sender: Res<InternalEventSender>,
-    employee_query: Query<(&InternalEntity, &Name, &Salary, &Satisfaction), With<Employed>>,
-    entity_query: Query<(&InternalEntity, &Name), Without<Employed>>,
+    server_game_state: Res<ServerGameState>,
 ) {
     while let Ok((_, client_command)) = channel.rx_fan_out_client_commands.try_recv() {
         needs_state_update.0 = true;
@@ -23,16 +22,22 @@ pub fn process_client_commands(
         match client_command {
             ClientCommand::PlayerAction(player_action) => match player_action {
                 PlayerAction::FireEmployee { employee_id } => {
-                    for (internal_entity, name, _, _) in employee_query.iter() {
-                        if internal_entity.id == employee_id {
-                            info!("Firing employee: {}", name.0);
-                            internal_event_sender
-                                .tx_internal_events
-                                .try_send(InternalEvent::RemoveEmployedStatus {
-                                    employee_id: internal_entity.id,
-                                })
-                                .unwrap();
-                            break;
+                    if let Some(employee) = server_game_state.game_state.entities.get(&employee_id) {
+                        info!("Firing employee: {}", employee.name);
+
+                        let _ = internal_event_sender.tx_internal_events.try_send(
+                            InternalEvent::RemoveEmployedStatus { employee_id },
+                        );
+
+                        for (org_id, org) in &server_game_state.game_state.organizations {
+                            if org.vp == Some(employee_id) {
+                                let _ = internal_event_sender.tx_internal_events.try_send(
+                                    InternalEvent::SetOrgVp {
+                                        organization_id: *org_id,
+                                        employee_id: None,
+                                    },
+                                );
+                            }
                         }
                     }
                 }
@@ -41,18 +46,20 @@ pub fn process_client_commands(
                     organization_id,
                     employee_id,
                 } => {
-                    for (internal_entity, name) in entity_query.iter() {
-                        if internal_entity.id == employee_id {
-                            info!("Hiring employee: {}", name.0);
-                            internal_event_sender
-                                .tx_internal_events
-                                .try_send(InternalEvent::AddEmployedStatus {
-                                    organization_id,
-                                    employee_id,
-                                })
-                                .unwrap();
-                            break;
-                        }
+                    if let Some((employee_id, employee)) = server_game_state
+                        .game_state
+                        .entities
+                        .iter()
+                        .find(|(entity_id, _)| **entity_id == employee_id)
+                    {
+                        info!("Hiring employee: {}", employee.name);
+                        internal_event_sender
+                            .tx_internal_events
+                            .try_send(InternalEvent::AddEmployedStatus {
+                                organization_id,
+                                employee_id: *employee_id,
+                            })
+                            .unwrap();
                     }
                 }
 
@@ -60,24 +67,29 @@ pub fn process_client_commands(
                     employee_id,
                     amount,
                 } => {
-                    for (internal_entity, _, _, _) in employee_query.iter() {
-                        if internal_entity.id == employee_id {
-                            internal_event_sender
-                                .tx_internal_events
-                                .try_send(InternalEvent::IncrementEmployeeSatisfaction {
-                                    employee_id,
-                                    amount: 1,
-                                })
-                                .unwrap();
+                    if let Some((employee_id, employee)) = server_game_state
+                        .game_state
+                        .entities
+                        .iter()
+                        .find(|(entity_id, _)| **entity_id == employee_id)
+                    {
+                        info!("Growing employee: {}", employee.name);
 
-                            internal_event_sender
-                                .tx_internal_events
-                                .try_send(InternalEvent::IncrementSalary {
-                                    employee_id,
-                                    amount,
-                                })
-                                .unwrap();
-                        }
+                        internal_event_sender
+                            .tx_internal_events
+                            .try_send(InternalEvent::IncrementEmployeeSatisfaction {
+                                employee_id: *employee_id,
+                                amount: 1,
+                            })
+                            .unwrap();
+
+                        internal_event_sender
+                            .tx_internal_events
+                            .try_send(InternalEvent::IncrementSalary {
+                                employee_id: *employee_id,
+                                amount,
+                            })
+                            .unwrap();
                     }
                 }
 
@@ -103,12 +115,37 @@ pub fn process_client_commands(
                 } => {
                     internal_event_sender
                         .tx_internal_events
+                        .try_send(InternalEvent::SetOrganizationRole {
+                            employee_id,
+                            new_role: OrganizationRole::VP,
+                        })
+                        .unwrap();
+
+                    let existing_vp_id = server_game_state
+                        .game_state
+                        .organizations
+                        .get(&organization_id)
+                        .and_then(|org| org.vp);
+
+                    if let Some(employee_id) = existing_vp_id {
+                        internal_event_sender
+                            .tx_internal_events
+                            .try_send(InternalEvent::SetOrganizationRole {
+                                employee_id,
+                                new_role: OrganizationRole::Manager,
+                            })
+                            .unwrap();
+                    }
+
+                    internal_event_sender
+                        .tx_internal_events
                         .try_send(InternalEvent::SetOrgVp {
                             organization_id,
-                            employee_id,
+                            employee_id: Some(employee_id),
                         })
                         .unwrap();
                 }
+
                 PlayerAction::UpdateBudget {
                     organization_id,
                     organization_budget,
@@ -116,26 +153,30 @@ pub fn process_client_commands(
                     .tx_internal_events
                     .try_send(InternalEvent::SetOrgBudget {
                         organization_id,
-                        organization_budget,
+                        budget: organization_budget,
                     })
                     .unwrap(),
             },
         }
 
-        let total_productivity: u32 = employee_query
-            .iter()
-            .map(|(_, _, _, sat)| sat.0 as u32)
+        let total_productivity: u16 = server_game_state
+            .game_state
+            .entities
+            .values()
+            .filter_map(|entity| entity.employment.as_ref().map(|e| e.satisfaction))
             .sum();
 
-        let total_expenses: u32 = employee_query
-            .iter()
-            .map(|(_, _, sal, _)| sal.0 as u32 / 52)
+        let total_expenses = server_game_state
+            .game_state
+            .entities
+            .values()
+            .filter_map(|entity| entity.employment.as_ref().map(|e| e.salary as i32))
             .sum();
 
         internal_event_sender
             .tx_internal_events
             .try_send(InternalEvent::IncrementMoney {
-                amount: total_productivity * 15,
+                amount: total_productivity as i32,
             })
             .unwrap();
 
@@ -143,6 +184,118 @@ pub fn process_client_commands(
             .tx_internal_events
             .try_send(InternalEvent::DecrementMoney {
                 amount: total_expenses,
+            })
+            .unwrap();
+
+        let mut new_player_history_points = HashMap::new();
+        let mut new_company_history_points = HashMap::new();
+        let mut new_organization_history_points = HashMap::new();
+
+        for player in &server_game_state.game_state.players {
+            let employees = server_game_state
+                .game_state
+                .entities
+                .values()
+                .filter_map(|entity| entity.employment.as_ref());
+
+            let (total_satisfaction, employee_count) = employees
+                .map(|e| e.satisfaction as u32)
+                .fold((0, 0), |(sum, count), sat| (sum + sat, count + 1));
+
+            let avg_employee_satisfaction = if employee_count > 0 {
+                ((total_satisfaction * 10000) / employee_count).min(10000) as u16
+            } else {
+                0
+            };
+
+            let history_point = HistoryPoint {
+                week: server_game_state.game_state.week,
+                financials: player.financials.clone(),
+                perception: player.perception.clone(),
+                avg_employee_satisfaction,
+            };
+
+            new_player_history_points.insert(
+                player.id.unwrap_or(Uuid::from_u128(987123564738)),
+                history_point,
+            );
+        }
+
+        for (company_id, company) in &server_game_state.game_state.companies {
+            let (total_satisfaction, employee_count): (u32, u32) = server_game_state
+                .game_state
+                .entities
+                .values()
+                .filter_map(|entity| {
+                    let employment = entity.employment.as_ref()?;
+                    let organization = server_game_state
+                        .game_state
+                        .organizations
+                        .get(&employment.organization_id)?;
+                    if organization.company_relation.entity_id == *company_id {
+                        Some((employment.satisfaction as u32, 1))
+                    } else {
+                        None
+                    }
+                })
+                .fold((0, 0), |(sum, count), (satisfaction, one)| {
+                    (sum + satisfaction, count + one)
+                });
+
+            let avg_employee_satisfaction: u16 = if employee_count > 0 {
+                ((total_satisfaction * 10000) / employee_count).min(10000) as u16
+            } else {
+                0
+            };
+
+            let history_point = HistoryPoint {
+                week: server_game_state.game_state.week,
+                financials: company.financials.clone(),
+                perception: company.perception.clone(),
+                avg_employee_satisfaction,
+            };
+
+            new_company_history_points.insert(*company_id, history_point);
+        }
+
+        for (organization_id, organization) in &server_game_state.game_state.organizations {
+            let (total_satisfaction, employee_count): (u32, u32) = server_game_state
+                .game_state
+                .entities
+                .values()
+                .filter_map(|entity| {
+                    entity
+                        .employment
+                        .as_ref()
+                        .filter(|e| e.organization_id == *organization_id)
+                        .map(|e| (e.satisfaction as u32, 1))
+                })
+                .fold((0, 0), |(sum, count), (satisfaction, one)| {
+                    (sum + satisfaction, count + one)
+                });
+
+            let avg_employee_satisfaction: u16 = if employee_count > 0 {
+                ((total_satisfaction * 10000) / employee_count).min(10000) as u16
+            } else {
+                0
+            };
+
+            let history_point = HistoryPoint {
+                week: server_game_state.game_state.week,
+                financials: organization.financials.clone(),
+                perception: organization.perception.clone(),
+                avg_employee_satisfaction,
+            };
+
+            new_organization_history_points.insert(*organization_id, history_point);
+        }
+
+        internal_event_sender
+            .tx_internal_events
+            .try_send(InternalEvent::AppendHistoryPoint {
+                new_player_history_points,
+                new_organization_history_points,
+                new_company_history_points,
             })
             .unwrap();
 
