@@ -43,7 +43,6 @@ pub fn process_internal_events(
             "Server has internal event for processing {:?}",
             internal_event
         );
-        needs_world_broadcast.0 = true;
 
         match internal_event {
             InternalEvent::RemoveEmployedStatus { employee_id } => {
@@ -157,6 +156,9 @@ pub fn process_internal_events(
             }
 
             InternalEvent::AdvanceWeek => {
+                // only broadcast after a week change.
+                needs_world_broadcast.0 = true;
+
                 let (_, _, _, _, mut week, _) = player_query.single_mut(world);
                 week.0 += 1;
             }

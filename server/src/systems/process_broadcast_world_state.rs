@@ -3,9 +3,10 @@ use crate::systems::ServerEventSender;
 use bevy::prelude::{Query, Res, ResMut, Without};
 use shared::{
     AnimalSnapshot, Company, Employed, EmployeeSnapshot, EntityType, GameStateSnapshot,
-    HumanSnapshot, InternalEntity, Level, Money, Name, Organization, OrganizationSnapshot, Owner,
-    Player, PublicOpinion, Reputation, Salary, Satisfaction, ServerEvent, Type, UnemployedSnapshot,
-    Week, WeekOfBirth,
+    HistoricalData, HistoryStateSnapshot, HumanSnapshot, InternalEntity, Level, Money, Name,
+    OrgHistoryPoint, OrgHistorySnapshot, Organization, OrganizationHistoryEntry,
+    OrganizationSnapshot, Owner, Player, PublicOpinion, Reputation, Salary, Satisfaction,
+    ServerEvent, Type, UnemployedSnapshot, Week, WeekOfBirth,
 };
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -14,6 +15,7 @@ use uuid::Uuid;
 #[allow(clippy::too_many_arguments)]
 pub fn process_broadcast_world_state(
     mut needs_broadcast: ResMut<NeedsWorldBroadcast>,
+    mut historical_data: ResMut<HistoricalData>,
     company: Res<Company>,
     query_player: Query<(
         &Player,
@@ -42,13 +44,28 @@ pub fn process_broadcast_world_state(
     server_event_sender: Res<ServerEventSender>,
 ) {
     // Only send if there's a connected player and we're due to broadcast
-    let (_, _, _, _, week, internal_entity) = query_player.single();
+    let (_, _, reputation, public_opinion, week, internal_entity) = query_player.single();
     if internal_entity.is_none() || !needs_broadcast.0 {
         return;
     }
     needs_broadcast.0 = false;
 
-    let (_, _, reputation, public_opinion, _, _) = query_player.single();
+    let mut children_map: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
+    let mut pets_map: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
+
+    for (internal_entity, _name, owner, type_, _birth) in entity_query.iter() {
+        if let Some(owner) = owner {
+            let target_map = if type_.0 == EntityType::Human {
+                &mut children_map
+            } else {
+                &mut pets_map
+            };
+            target_map
+                .entry(owner.owner_id.unwrap())
+                .or_default()
+                .push(internal_entity.id);
+        }
+    }
 
     let mut org_map: HashMap<Uuid, Vec<EmployeeSnapshot>> = HashMap::new();
 
@@ -65,24 +82,8 @@ pub fn process_broadcast_world_state(
             entity_type: type_.0.clone(),
             organization_id: Some(employed.owner_id),
             week_of_birth: week_of_birth.0,
-            children_ids: entity_query
-                .iter()
-                .filter(|(_, _, owner, _, _)| owner.is_some())
-                .filter(|(_, _, owner, _, _)| {
-                    owner.unwrap().owner_id.unwrap() == internal_entity.id
-                })
-                .filter(|(_, _, _, type_, _)| type_.0 == EntityType::Human)
-                .map(|(internal_entity, _, _, _, _)| internal_entity.id)
-                .collect(),
-            pet_ids: entity_query
-                .iter()
-                .filter(|(_, _, owner, _, _)| owner.is_some())
-                .filter(|(_, _, owner, _, _)| {
-                    owner.unwrap().owner_id.unwrap() == internal_entity.id
-                })
-                .filter(|(_, _, _, type_, _)| type_.0 != EntityType::Human)
-                .map(|(internal_entity, _, _, _, _)| internal_entity.id)
-                .collect(),
+            children_ids: children_map.remove(&internal_entity.id).unwrap_or_default(),
+            pet_ids: pets_map.remove(&internal_entity.id).unwrap_or_default(),
         };
 
         org_map
@@ -150,6 +151,67 @@ pub fn process_broadcast_world_state(
         )
         .collect::<Vec<_>>();
 
+    for org in &organizations {
+        let net_profit = org.financials.this_weeks_income - org.financials.this_weeks_expenses;
+
+        historical_data
+            .org_history
+            .entry(org.id)
+            .or_default()
+            .push(OrganizationHistoryEntry {
+                week: week.0 as i32,
+                cash: org.financials.actual_cash,
+                income: org.financials.this_weeks_income,
+                expenses: org.financials.this_weeks_expenses,
+                net_profit,
+                public_opinion: org.public_opinion,
+                reputation: org.reputation,
+                avg_employee_satisfaction: if org.employees.is_empty() {
+                    0
+                } else {
+                    org.employees.iter().map(|e| e.satisfaction).sum::<i32>()
+                        / org.employees.len() as i32
+                },
+                budgets: org.budget.clone(),
+            });
+    }
+
+    const HISTORY_WINDOW: i32 = 40;
+
+    let history_snapshot = HistoryStateSnapshot {
+        week: week.0 as i32,
+        organizations: organizations
+            .iter()
+            .map(|org| {
+                let history = historical_data
+                    .org_history
+                    .get(&org.id)
+                    .map(|entries| {
+                        let total = entries.len();
+                        let start = total.saturating_sub(HISTORY_WINDOW as usize);
+                        &entries[start..]
+                    })
+                    .unwrap_or(&[]);
+
+                OrgHistorySnapshot {
+                    org_id: org.id,
+                    name: org.name.clone(),
+                    recent_history: history
+                        .iter()
+                        .map(|entry| OrgHistoryPoint {
+                            week: entry.week,
+                            net_profit: entry.net_profit,
+                            cash: entry.cash,
+                            public_opinion: entry.public_opinion,
+                            reputation: entry.reputation,
+                            avg_employee_satisfaction: entry.avg_employee_satisfaction,
+                        })
+                        .collect(),
+                }
+            })
+            .collect(),
+    };
+
     let snapshot = GameStateSnapshot {
         week: week.0,
         financials: company.financials.clone(),
@@ -166,4 +228,8 @@ pub fn process_broadcast_world_state(
     let _ = server_event_sender
         .tx_server_events
         .try_send(ServerEvent::FullState(snapshot));
+
+    let _ = server_event_sender
+        .tx_server_events
+        .try_send(ServerEvent::HistoryState(history_snapshot));
 }

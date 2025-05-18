@@ -1,7 +1,7 @@
 use crate::systems::ServerEventsReceiver;
 use bevy::ecs::system::SystemState;
 use bevy::prelude::{Commands, ResMut, World};
-use shared::{GameStateSnapshot, ServerEvent};
+use shared::{GameStateSnapshot, HistoryStateSnapshot, ServerEvent};
 use tracing::{debug, info};
 
 pub fn process_server_events(
@@ -9,10 +9,12 @@ pub fn process_server_events(
     params: &mut SystemState<(
         ResMut<ServerEventsReceiver>,
         ResMut<GameStateSnapshot>,
+        ResMut<HistoryStateSnapshot>,
         Commands,
     )>,
 ) {
-    let (server_events_receiver, mut game_state_snapshot, _) = params.get_mut(world);
+    let (server_events_receiver, mut game_state_snapshot, mut history_state_snapshot, _) =
+        params.get_mut(world);
     let received = server_events_receiver.rx_server_events.try_recv();
     if received.is_err() {
         debug!(
@@ -36,6 +38,9 @@ pub fn process_server_events(
             game_state_snapshot.pets = rx_game_state_snapshot.pets;
             game_state_snapshot.humans = rx_game_state_snapshot.humans;
             game_state_snapshot.unemployed = rx_game_state_snapshot.unemployed;
+        }
+        ServerEvent::HistoryState(rx_history_snapshot) => {
+            *history_state_snapshot = rx_history_snapshot;
         }
     }
 }

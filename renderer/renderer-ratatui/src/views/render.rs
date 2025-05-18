@@ -4,9 +4,14 @@ use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::prelude::{Color, Style};
 use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
-use shared::GameStateSnapshot;
+use shared::{GameStateSnapshot, HistoryStateSnapshot};
 
-pub fn render(route: &Route, game_state_snapshot: &GameStateSnapshot, frame: &mut Frame) {
+pub fn render(
+    route: &Route,
+    game_state_snapshot: &GameStateSnapshot,
+    history_state_snapshot: &HistoryStateSnapshot,
+    frame: &mut Frame,
+) {
     let outer_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -27,9 +32,13 @@ pub fn render(route: &Route, game_state_snapshot: &GameStateSnapshot, frame: &mu
     render_tooltip(frame, tooltip_area, route);
 
     match route {
-        Route::OrganizationList { data } => {
-            render_organization_list(game_state_snapshot, frame, &main_area, &data.selected_index)
-        }
+        Route::OrganizationList { data } => render_organization_list(
+            game_state_snapshot,
+            history_state_snapshot,
+            frame,
+            &main_area,
+            &data.selected_index,
+        ),
         Route::OrganizationView { data } => {
             render_organization_view(game_state_snapshot, frame, &main_area, data)
         }
