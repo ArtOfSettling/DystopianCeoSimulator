@@ -33,6 +33,7 @@ pub fn process_organization_updates(
             rnd,
             training,
         } = org.budget;
+
         let total_budget = marketing + rnd + training;
         let can_afford = org.financials.actual_cash >= total_budget as i32;
 

@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use shared::{Financials, GameStateSnapshot};
+use shared::{Financials, GameStateSnapshot, HistoryStateSnapshot};
 
 pub fn setup_world_state(mut commands: Commands) {
     commands.insert_resource(GameStateSnapshot {
@@ -18,5 +18,9 @@ pub fn setup_world_state(mut commands: Commands) {
         pets: vec![],
         humans: vec![],
         unemployed: vec![],
-    })
+    });
+    commands.insert_resource(HistoryStateSnapshot {
+        week: 1,
+        organizations: vec![],
+    });
 }

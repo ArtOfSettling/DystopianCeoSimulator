@@ -84,6 +84,7 @@ pub enum ServerEvent {
     None,
 
     FullState(GameStateSnapshot),
+    HistoryState(HistoryStateSnapshot),
 }
 
 #[derive(Resource, Clone, Debug, Serialize, Deserialize)]
@@ -147,6 +148,29 @@ pub struct AnimalSnapshot {
     pub name: String,
     pub entity_type: EntityType,
     pub week_of_birth: i32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct OrgHistoryPoint {
+    pub week: i32,
+    pub net_profit: i32,
+    pub cash: i32,
+    pub public_opinion: i32,
+    pub reputation: i32,
+    pub avg_employee_satisfaction: i32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct OrgHistorySnapshot {
+    pub org_id: Uuid,
+    pub name: String,
+    pub recent_history: Vec<OrgHistoryPoint>,
+}
+
+#[derive(Resource, Clone, Debug, Serialize, Deserialize)]
+pub struct HistoryStateSnapshot {
+    pub week: i32,
+    pub organizations: Vec<OrgHistorySnapshot>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
