@@ -85,8 +85,16 @@ pub struct Organization {
     pub id: Uuid,
     pub name: String,
     pub vp: Option<Uuid>,
-    pub initiatives: Vec<OrgInitiative>,
+    pub budget: OrgBudget,
     pub financials: Financials,
+    pub initiatives: Vec<OrgInitiative>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct OrgBudget {
+    pub marketing: u32,
+    pub rnd: u32,
+    pub training: u32,
 }
 
 #[derive(Component, Clone, Debug, Serialize, Deserialize)]

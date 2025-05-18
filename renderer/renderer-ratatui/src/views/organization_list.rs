@@ -80,6 +80,10 @@ pub fn render_organization_summary(
                     .map_or("Unknown".to_string(), |e| e.name.clone())
             })
         ),
+        "Budget:".to_string(),
+        format!("• Marketing {} (p/w)", org_snapshot.budget.marketing),
+        format!("• Training {} (p/w)", org_snapshot.budget.training),
+        format!("• R&D {} (p/w)", org_snapshot.budget.rnd),
         format!("Reputation: {}", org_snapshot.reputation),
         format!("Public Opinion: {}", org_snapshot.public_opinion),
         format!("Employees: {}", org_snapshot.employees.len()),

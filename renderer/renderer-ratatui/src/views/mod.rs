@@ -1,3 +1,4 @@
+mod organization_budget;
 mod organization_details;
 pub mod organization_hiring;
 pub mod organization_list;

@@ -109,6 +109,16 @@ pub fn process_client_commands(
                         })
                         .unwrap();
                 }
+                PlayerAction::UpdateBudget {
+                    organization_id,
+                    organization_budget,
+                } => internal_event_sender
+                    .tx_internal_events
+                    .try_send(InternalEvent::SetOrgBudget {
+                        organization_id,
+                        organization_budget,
+                    })
+                    .unwrap(),
             },
         }
 

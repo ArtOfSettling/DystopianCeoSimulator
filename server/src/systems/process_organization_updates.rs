@@ -1,8 +1,8 @@
 use crate::{InternalEventSender, NeedsStateUpdate};
 use bevy::prelude::{Query, Res, With};
 use shared::{
-    Employed, Financials, InternalEntity, InternalEvent, OrgInitiative, Organization, Salary,
-    Satisfaction,
+    Employed, Financials, InternalEntity, InternalEvent, OrgBudget, OrgInitiative, Organization,
+    Salary, Satisfaction,
 };
 
 pub fn process_organization_updates(
@@ -16,7 +16,6 @@ pub fn process_organization_updates(
     }
 
     organization_query.iter().for_each(|org| {
-        // Collect all employees for this organization
         let employees: Vec<_> = employee_query
             .iter()
             .filter(|(_, employed, _, _)| employed.owner_id == org.id)
@@ -27,7 +26,51 @@ pub fn process_organization_updates(
             .map(|(_, _, _, satisfaction)| satisfaction.0)
             .sum();
 
-        let expenses: i32 = employees.iter().map(|(_, _, salary, _)| salary.0).sum();
+        let mut expenses: i32 = employees.iter().map(|(_, _, salary, _)| salary.0).sum();
+
+        let OrgBudget {
+            marketing,
+            rnd,
+            training,
+        } = org.budget;
+        let total_budget = marketing + rnd + training;
+        let can_afford = org.financials.actual_cash >= total_budget as i32;
+
+        if can_afford {
+            expenses += total_budget as i32;
+
+            if marketing > 0 {
+                internal_event_sender
+                    .tx_internal_events
+                    .try_send(InternalEvent::IncrementOrgPublicOpinion {
+                        organization_id: org.id,
+                        amount: (marketing / 1000).max(1),
+                    })
+                    .unwrap();
+            }
+
+            if rnd > 0 {
+                internal_event_sender
+                    .tx_internal_events
+                    .try_send(InternalEvent::IncrementOrgReputation {
+                        organization_id: org.id,
+                        amount: (rnd / 2000).max(1),
+                    })
+                    .unwrap();
+            }
+
+            if training > 0 {
+                for (internal_entity, _, _, _) in employees {
+                    internal_event_sender
+                        .tx_internal_events
+                        .try_send(InternalEvent::IncrementEmployeeSatisfaction {
+                            employee_id: internal_entity.id,
+                            amount: (training / 5000).max(1),
+                        })
+                        .unwrap();
+                }
+            }
+        }
 
         let productivity_multiplier = 125;
         let income = productivity * productivity_multiplier;

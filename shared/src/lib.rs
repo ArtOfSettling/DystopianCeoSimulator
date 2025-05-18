@@ -31,6 +31,14 @@ pub enum InternalEvent {
         employee_id: Uuid,
         amount: u32,
     },
+    IncrementOrgPublicOpinion {
+        organization_id: Uuid,
+        amount: u32,
+    },
+    IncrementOrgReputation {
+        organization_id: Uuid,
+        amount: u32,
+    },
     IncrementSalary {
         employee_id: Uuid,
         amount: u32,
@@ -60,6 +68,10 @@ pub enum InternalEvent {
         organization_id: Uuid,
         reputation_delta: i32,
         public_opinion_delta: i32,
+    },
+    SetOrgBudget {
+        organization_id: Uuid,
+        organization_budget: OrgBudget,
     },
     SetCompanyFinancials {
         financials: Financials,
@@ -99,6 +111,7 @@ pub struct OrganizationSnapshot {
     pub id: Uuid,
     pub name: String,
     pub vp: Option<Uuid>,
+    pub budget: OrgBudget,
     pub employees: Vec<EmployeeSnapshot>,
     pub initiatives: Vec<OrgInitiative>,
     pub financials: Financials,
@@ -154,6 +167,10 @@ pub enum PlayerAction {
     PromoteToVp {
         organization_id: Uuid,
         employee_id: Uuid,
+    },
+    UpdateBudget {
+        organization_id: Uuid,
+        organization_budget: OrgBudget,
     },
 }
 

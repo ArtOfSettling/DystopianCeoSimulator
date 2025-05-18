@@ -56,6 +56,10 @@ fn update_input(mut pending_player_input_action: ResMut<PendingPlayerInputAction
                     Some(PlayerInputAction::MenuSelect)
                 }
 
+                KeyCode::Char('<') => Some(PlayerInputAction::MenuDecrement),
+                KeyCode::Char('>') => Some(PlayerInputAction::MenuIncrement),
+                KeyCode::Enter => Some(PlayerInputAction::MenuCommit),
+
                 KeyCode::Tab => Some(PlayerInputAction::MenuChangeTab),
 
                 KeyCode::Char('h') => Some(PlayerInputAction::SelectEmployeeToHire),

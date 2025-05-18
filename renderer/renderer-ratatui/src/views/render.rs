@@ -96,6 +96,9 @@ fn render_tooltip(frame: &mut Frame, rect: Rect, route: &Route) {
             OrganizationTab::Detail => {
                 "← Back to List | ↑↓ Navigate | [Tab] Change Tab | [f] Fire | [r] Raise | [p] Promote | [q] Quit"
             }
+            OrganizationTab::Budget => {
+                "← Back to Detail | ↑↓ Navigate | < > Adjust | [Enter] Confirm"
+            }
             OrganizationTab::Hiring => "← Back to Detail | ↑↓ Navigate | [h] Hire | [q] Quit",
         },
     };
