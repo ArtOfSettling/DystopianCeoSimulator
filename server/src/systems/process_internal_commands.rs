@@ -1,53 +1,40 @@
 use crate::NeedsWorldBroadcast;
 use crate::internal_commands::InternalCommand;
 use crate::systems::ServerEventSender;
-use bevy::prelude::{Commands, Entity, Query, Res, ResMut};
-use shared::components::InternalEntity;
-use shared::{Money, Player, Reputation, Week};
+use bevy::prelude::{Res, ResMut};
+use shared::ServerGameState;
 use tracing::info;
 
-#[allow(clippy::type_complexity)]
 pub fn process_internal_commands(
-    mut commands: Commands,
     mut needs_broadcast: ResMut<NeedsWorldBroadcast>,
     channel: Res<ServerEventSender>,
-    player_query: Query<(
-        Entity,
-        &Player,
-        &Money,
-        &Reputation,
-        &Week,
-        Option<&InternalEntity>,
-    )>,
+    mut server_game_state: ResMut<ServerGameState>,
 ) {
-    while let Ok(internal_command) = channel.rx_internal_server_commands.try_recv() {
-        info!(
-            "Server has internal command for processing {:?}",
-            internal_command
-        );
-        match internal_command {
-            InternalCommand::PlayerConnected(internal_entity) => {
-                info!("attaching tracked_entity {:?}", internal_entity.clone());
+    if server_game_state.game_state.players.len() > 1 {
+        panic!("More than one player in the world, this is weird");
+    }
 
-                let (entity, _, _, _, _, _) = player_query.get_single().unwrap();
-                info!(
-                    "attaching tracked_entity {:?} to player",
-                    internal_entity.clone()
-                );
+    if let Some(player) = server_game_state.game_state.players.first_mut() {
+        while let Ok(internal_command) = channel.rx_internal_server_commands.try_recv() {
+            info!(
+                "Server has internal command for processing {:?}",
+                internal_command
+            );
 
-                commands.entity(entity).insert(internal_entity.clone());
-                needs_broadcast.0 = true;
+            match internal_command {
+                InternalCommand::PlayerConnected { player_id } => {
+                    info!("attaching tracked_entity {:?}", player_id);
+                    player.id = Some(player_id);
+                }
+                InternalCommand::PlayerDisconnected { player_id } => {
+                    info!("de-spawning player with uuid {:?}", player_id);
+                    player.id = None;
+                }
             }
-            InternalCommand::PlayerDisconnected(disconnected_internal_entity) => {
-                info!(
-                    "de-spawning player with uuid {:?} at (0, 0)",
-                    disconnected_internal_entity
-                );
 
-                let (entity, _, _, _, _, _) = player_query.get_single().unwrap();
-
-                commands.entity(entity).remove::<InternalEntity>();
-            }
+            needs_broadcast.0 = true;
         }
+    } else {
+        panic!("Not a single player in the world, this is weird")
     }
 }

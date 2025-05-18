@@ -1,44 +1,20 @@
 use crate::NeedsWorldBroadcast;
 use crate::systems::FanOutEventReceiver;
-use bevy::ecs::system::SystemState;
-use bevy::prelude::{Entity, QueryState, Res, ResMut, Without, World};
-use shared::components::InternalEntity;
+use bevy::prelude::{Res, ResMut};
 use shared::{
-    Company, Employed, EmployeeFlags, InternalEvent, Level, Money, Name, OrgRole, Organization,
-    Player, Productivity, PublicOpinion, Reputation, Salary, Satisfaction, Week,
+    CompanyHistory, Employment, InternalEvent, MAX_HISTORY_POINTS, OrganizationHistory,
+    OrganizationRole, PlayerHistory, ServerGameState, ServerHistoryState,
 };
+use std::collections::VecDeque;
 use tracing::info;
 
-#[allow(clippy::type_complexity)]
 pub fn process_internal_events(
-    world: &mut World,
-    player_query: &mut QueryState<(
-        Entity,
-        &Player,
-        &mut Money,
-        &mut Reputation,
-        &mut Week,
-        Option<&InternalEntity>,
-    )>,
-    employee_query: &mut QueryState<(
-        Entity,
-        &mut InternalEntity,
-        &mut Name,
-        &mut Employed,
-        &mut Salary,
-        &mut Satisfaction,
-    )>,
-    entity_query: &mut QueryState<(Entity, &mut InternalEntity), Without<Employed>>,
-    organizations: &mut QueryState<(&mut Organization, &mut Reputation, &mut PublicOpinion)>,
-    params: &mut SystemState<(
-        ResMut<Company>,
-        ResMut<NeedsWorldBroadcast>,
-        Res<FanOutEventReceiver>,
-    )>,
+    fan_out_event_receiver: Res<FanOutEventReceiver>,
+    mut server_game_state: ResMut<ServerGameState>,
+    mut server_history_state: ResMut<ServerHistoryState>,
+    mut needs_world_broadcast: ResMut<NeedsWorldBroadcast>,
 ) {
-    let (mut company, mut needs_world_broadcast, fan_out_event_receiver) = params.get_mut(world);
-
-    if let Ok(internal_event) = fan_out_event_receiver.rx_fan_out_events.try_recv() {
+    while let Ok(internal_event) = fan_out_event_receiver.rx_fan_out_events.try_recv() {
         info!(
             "Server has internal event for processing {:?}",
             internal_event
@@ -46,11 +22,8 @@ pub fn process_internal_events(
 
         match internal_event {
             InternalEvent::RemoveEmployedStatus { employee_id } => {
-                for (entity, internal_entity, _, _, _, _) in employee_query.iter_mut(world) {
-                    if internal_entity.id == employee_id {
-                        world.entity_mut(entity).remove::<Employed>();
-                        break;
-                    }
+                if let Some(entity) = server_game_state.game_state.entities.get_mut(&employee_id) {
+                    entity.employment = None;
                 }
             }
 
@@ -58,51 +31,50 @@ pub fn process_internal_events(
                 organization_id,
                 employee_id,
             } => {
-                for (entity, internal_entity) in entity_query.iter_mut(world) {
-                    if internal_entity.id == employee_id {
-                        world.entity_mut(entity).insert(Employed {
-                            owner_id: organization_id,
-                            role: OrgRole::Employee,
-                        });
-
-                        world.entity_mut(entity).insert_if_new((
-                            Level(10_000),
-                            Satisfaction(80),
-                            Productivity(80),
-                            Salary(7_000),
-                            EmployeeFlags(vec![]),
-                        ));
-
-                        break;
-                    }
+                if let Some(entity) = server_game_state.game_state.entities.get_mut(&employee_id) {
+                    entity.employment = Some(Employment {
+                        organization_id,
+                        role: OrganizationRole::Worker,
+                        employee_flags: vec![],
+                        level: 10_000,
+                        salary: 7_000,
+                        satisfaction: 80,
+                        productivity: 80,
+                    });
                 }
             }
 
             InternalEvent::DecrementReputation { amount } => {
-                for (_, _, _, mut rep, _, _) in player_query.iter_mut(world) {
-                    rep.0 -= amount as i32;
+                if let Some(player) = server_game_state.game_state.players.first_mut() {
+                    player.perception.reputation -= amount;
+                }
+            }
+
+            InternalEvent::IncrementReputation { amount } => {
+                if let Some(player) = server_game_state.game_state.players.first_mut() {
+                    player.perception.reputation += amount;
                 }
             }
 
             InternalEvent::DecrementMoney { amount } => {
-                for (_, _, mut money, _, _, _) in player_query.iter_mut(world) {
-                    money.0 -= amount as i32;
+                if let Some(player) = server_game_state.game_state.players.first_mut() {
+                    player.financials.actual_cash -= amount;
                 }
             }
 
             InternalEvent::IncrementMoney { amount } => {
-                let (_, _, mut money, _, _, _) = player_query.single_mut(world);
-                money.0 += amount as i32;
+                if let Some(player) = server_game_state.game_state.players.first_mut() {
+                    player.financials.actual_cash += amount;
+                }
             }
 
             InternalEvent::IncrementEmployeeSatisfaction {
                 employee_id,
                 amount,
             } => {
-                for (_, internal_entity, _, _, _, mut sat) in employee_query.iter_mut(world) {
-                    if internal_entity.id == employee_id {
-                        sat.0 += amount as i32;
-                        break;
+                if let Some(entity) = server_game_state.game_state.entities.get_mut(&employee_id) {
+                    if let Some(employment) = &mut entity.employment {
+                        employment.satisfaction += amount;
                     }
                 }
             }
@@ -111,10 +83,12 @@ pub fn process_internal_events(
                 organization_id,
                 amount,
             } => {
-                for (org, _, mut public_opinion) in organizations.iter_mut(world) {
-                    if org.id == organization_id {
-                        public_opinion.0 += amount as i32;
-                    }
+                if let Some(organization) = server_game_state
+                    .game_state
+                    .organizations
+                    .get_mut(&organization_id)
+                {
+                    organization.perception.public_opinion += amount;
                 }
             }
 
@@ -122,10 +96,12 @@ pub fn process_internal_events(
                 organization_id,
                 amount,
             } => {
-                for (org, mut reputation, _) in organizations.iter_mut(world) {
-                    if org.id == organization_id {
-                        reputation.0 += amount as i32;
-                    }
+                if let Some(organization) = server_game_state
+                    .game_state
+                    .organizations
+                    .get_mut(&organization_id)
+                {
+                    organization.perception.reputation += amount;
                 }
             }
 
@@ -133,65 +109,33 @@ pub fn process_internal_events(
                 employee_id,
                 amount,
             } => {
-                for (_, internal_entity, _, _, mut salary, _) in employee_query.iter_mut(world) {
-                    if internal_entity.id == employee_id {
-                        salary.0 += amount as i32;
-                        break;
+                if let Some(entity) = server_game_state.game_state.entities.get_mut(&employee_id) {
+                    if let Some(employment) = &mut entity.employment {
+                        employment.salary += amount;
                     }
                 }
-            }
-
-            InternalEvent::IncrementReputation { amount } => {
-                for (_, _, _, mut rep, _, _) in player_query.iter_mut(world) {
-                    rep.0 += amount as i32;
-                }
-            }
-
-            InternalEvent::RemoveOrgVp { organization_id } => {
-                for (mut org, _, _) in organizations.iter_mut(world) {
-                    if org.id == organization_id {
-                        org.vp = None;
-                    }
-                }
-            }
-
-            InternalEvent::AdvanceWeek => {
-                // only broadcast after a week change.
-                needs_world_broadcast.0 = true;
-
-                let (_, _, _, _, mut week, _) = player_query.single_mut(world);
-                week.0 += 1;
             }
 
             InternalEvent::SetOrgVp {
                 organization_id,
                 employee_id,
             } => {
-                // Replace the existing vp
-                let mut vp_to_remove = None;
-                for (mut org, _, _) in organizations.iter_mut(world) {
-                    if org.id == organization_id {
-                        vp_to_remove = org.vp;
-                        org.vp = Some(employee_id);
-                        break;
-                    }
-                }
-
-                // update employee titles
-                for (_entity, internal_entity, _name, mut employed, _salary, _satisfaction) in
-                    employee_query.iter_mut(world)
+                if let Some(organization) = server_game_state
+                    .game_state
+                    .organizations
+                    .get_mut(&organization_id)
                 {
-                    if internal_entity.id == employee_id {
-                        employed.role = OrgRole::VP;
-                        continue;
-                    }
-                    if vp_to_remove.is_none() {
-                        continue;
-                    }
-
-                    if internal_entity.id == vp_to_remove.unwrap() {
-                        employed.role = OrgRole::Employee;
-                        continue;
+                    organization.vp = employee_id;
+                }
+            }
+            
+            InternalEvent::SetOrganizationRole {
+                employee_id,
+                new_role
+            } => {
+                if let Some(entity) = server_game_state.game_state.entities.get_mut(&employee_id) {
+                    if let Some(employment) = &mut entity.employment {
+                        employment.role = new_role;
                     }
                 }
             }
@@ -200,11 +144,12 @@ pub fn process_internal_events(
                 organization_id,
                 financials,
             } => {
-                for (mut org, _, _) in organizations.iter_mut(world) {
-                    if org.id == organization_id {
-                        org.financials = financials.clone();
-                        break;
-                    }
+                if let Some(organization) = server_game_state
+                    .game_state
+                    .organizations
+                    .get_mut(&organization_id)
+                {
+                    organization.financials = financials.clone();
                 }
             }
 
@@ -212,44 +157,101 @@ pub fn process_internal_events(
                 organization_id,
                 initiatives,
             } => {
-                for (mut org, _, _) in organizations.iter_mut(world) {
-                    if org.id == organization_id {
-                        org.initiatives = initiatives.clone();
-                        break;
-                    }
+                if let Some(organization) = server_game_state
+                    .game_state
+                    .organizations
+                    .get_mut(&organization_id)
+                {
+                    organization.initiatives = initiatives.clone();
                 }
             }
 
             InternalEvent::SetOrgPublicOpinion {
                 organization_id,
-                reputation_delta,
-                public_opinion_delta,
+                perception,
             } => {
-                for (org, mut reputation, mut public_opinion) in organizations.iter_mut(world) {
-                    if org.id == organization_id {
-                        reputation.0 += reputation_delta;
-                        public_opinion.0 += public_opinion_delta;
-                        break;
-                    }
+                if let Some(organization) = server_game_state
+                    .game_state
+                    .organizations
+                    .get_mut(&organization_id)
+                {
+                    organization.perception = perception.clone();
                 }
             }
 
             InternalEvent::SetOrgBudget {
                 organization_id,
-                organization_budget,
+                budget,
             } => {
-                for (mut org, _, _) in organizations.iter_mut(world) {
-                    if org.id == organization_id {
-                        org.budget.marketing = organization_budget.marketing;
-                        org.budget.rnd = organization_budget.rnd;
-                        org.budget.training = organization_budget.training;
-                        break;
+                if let Some(organization) = server_game_state
+                    .game_state
+                    .organizations
+                    .get_mut(&organization_id)
+                {
+                    organization.budget = budget.clone();
+                }
+            }
+
+            InternalEvent::SetCompanyFinancials {
+                company_id,
+                financials,
+            } => {
+                if let Some(company) = server_game_state.game_state.companies.get_mut(&company_id) {
+                    company.financials = financials.clone();
+                }
+            }
+
+            InternalEvent::AppendHistoryPoint {
+                new_player_history_points,
+                new_company_history_points,
+                new_organization_history_points,
+            } => {
+                for (player_id, history_point) in new_player_history_points {
+                    let player_history = server_history_state
+                        .history_state
+                        .players
+                        .entry(player_id)
+                        .or_insert_with(|| PlayerHistory {
+                            recent_history: VecDeque::new(),
+                        });
+                    player_history.recent_history.push_back(history_point);
+                    if player_history.recent_history.iter().len() > MAX_HISTORY_POINTS {
+                        player_history.recent_history.pop_front();
+                    }
+                }
+
+                for (company_id, history_point) in new_company_history_points {
+                    let company_history = server_history_state
+                        .history_state
+                        .companies
+                        .entry(company_id)
+                        .or_insert_with(|| CompanyHistory {
+                            recent_history: VecDeque::new(),
+                        });
+                    company_history.recent_history.push_back(history_point);
+                    if company_history.recent_history.iter().len() > MAX_HISTORY_POINTS {
+                        company_history.recent_history.pop_front();
+                    }
+                }
+
+                for (organization_id, history_point) in new_organization_history_points {
+                    let org_history = server_history_state
+                        .history_state
+                        .organizations
+                        .entry(organization_id)
+                        .or_insert_with(|| OrganizationHistory {
+                            recent_history: VecDeque::new(),
+                        });
+                    org_history.recent_history.push_back(history_point);
+                    if org_history.recent_history.iter().len() > MAX_HISTORY_POINTS {
+                        org_history.recent_history.pop_front();
                     }
                 }
             }
 
-            InternalEvent::SetCompanyFinancials { financials } => {
-                company.financials = financials.clone();
+            InternalEvent::AdvanceWeek => {
+                server_game_state.game_state.week += 1;
+                needs_world_broadcast.0 = true;
             }
         }
     }

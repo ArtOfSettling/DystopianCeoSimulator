@@ -1,7 +1,30 @@
 use bevy::app::AppExit;
-use bevy::prelude::{EventWriter, Res, ResMut, Resource};
+use bevy::prelude::{EventWriter, ResMut, Resource};
 use input_api::PendingPlayerInputAction;
-use shared::{GameStateSnapshot, HistoryStateSnapshot, PendingPlayerAction};
+use shared::{Company, Entity, HistoryState, Organization, PendingPlayerAction, Player};
+use std::collections::HashMap;
+use uuid::Uuid;
+
+#[derive(Resource)]
+pub struct ClientGameState {
+    pub week: u16,
+    pub players: Vec<Player>,
+    pub companies: HashMap<Uuid, Company>,
+    pub organizations: HashMap<Uuid, Organization>,
+    pub entities: HashMap<Uuid, Entity>,
+
+    pub ordered_organizations_of_company: HashMap<Uuid, Vec<Uuid>>,
+    pub ordered_employees_of_organization: HashMap<Uuid, Vec<Uuid>>,
+    pub ordered_employees_of_company: HashMap<Uuid, Vec<Uuid>>,
+    pub ordered_unemployed_entities: Vec<Uuid>,
+    pub ordered_pets_of_entity: HashMap<Uuid, Vec<Uuid>>,
+    pub ordered_children_of_entity: HashMap<Uuid, Vec<Uuid>>,
+}
+
+#[derive(Resource)]
+pub struct ClientHistoryState {
+    pub history_state: HistoryState,
+}
 
 #[derive(Resource)]
 pub struct RendererResource {
@@ -17,8 +40,8 @@ impl RendererResource {
 pub trait Renderer {
     fn render(
         &mut self,
-        game_state_snapshot: Res<GameStateSnapshot>,
-        history_state_snapshot: Res<HistoryStateSnapshot>,
+        game_state: &ClientGameState,
+        history_state: &ClientHistoryState,
         pending_player_input_action: ResMut<PendingPlayerInputAction>,
         pending_player_action: ResMut<PendingPlayerAction>,
         exit_writer: EventWriter<AppExit>,

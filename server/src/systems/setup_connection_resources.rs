@@ -8,7 +8,6 @@ use bevy::prelude::{Commands, Resource};
 use bevy::tasks::IoTaskPool;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use futures::{AsyncWriteExt, FutureExt};
-use shared::components::InternalEntity;
 use shared::{ClientCommand, ServerEvent};
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -72,7 +71,7 @@ async fn setup_connection_handler(
                     let addr_str = addr.to_string();
                     let uuid = Uuid::new_v5(&Uuid::NAMESPACE_DNS, addr_str.as_bytes());
                     tx_internal_server_commands
-                        .send(PlayerConnected(InternalEntity { id: uuid }))
+                        .send(PlayerConnected { player_id: uuid })
                         .await
                         .unwrap();
 
@@ -152,7 +151,7 @@ async fn handle_client(
 
                         // Send PlayerDisconnected internal command before exiting
                         if let Err(e) = tx_internal_server_commands.send(
-                            InternalCommand::PlayerDisconnected(InternalEntity { id: uuid })
+                            InternalCommand::PlayerDisconnected { player_id: uuid }
                         ).await {
                             error!("Failed to send PlayerDisconnected command: {:?}", e);
                         }

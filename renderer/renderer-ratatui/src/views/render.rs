@@ -4,14 +4,18 @@ use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::prelude::{Color, Style};
 use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
-use shared::{GameStateSnapshot, HistoryStateSnapshot};
+use renderer_api::{ClientGameState, ClientHistoryState};
 
 pub fn render(
     route: &Route,
-    game_state_snapshot: &GameStateSnapshot,
-    history_state_snapshot: &HistoryStateSnapshot,
+    client_game_state: &ClientGameState,
+    client_history_state: &ClientHistoryState,
     frame: &mut Frame,
 ) {
+    if client_game_state.players.is_empty() {
+        return;
+    }
+
     let outer_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -27,34 +31,34 @@ pub fn render(
     let financial_area = outer_chunks[2];
     let tooltip_area = outer_chunks[3];
 
-    render_vitals_summary(frame, vitals_area, game_state_snapshot);
-    render_financial_summary(frame, financial_area, game_state_snapshot);
+    render_vitals_summary(frame, vitals_area, client_game_state);
+    render_financial_summary(frame, financial_area, client_game_state);
     render_tooltip(frame, tooltip_area, route);
+
+    let (company_id, _company) = client_game_state.companies.iter().next().unwrap();
 
     match route {
         Route::OrganizationList { data } => render_organization_list(
-            game_state_snapshot,
-            history_state_snapshot,
+            client_game_state,
+            client_history_state,
             frame,
             &main_area,
+            &company_id,
             &data.selected_index,
         ),
         Route::OrganizationView { data } => {
-            render_organization_view(game_state_snapshot, frame, &main_area, data)
+            render_organization_view(client_game_state, frame, &main_area, data)
         }
     }
 }
 
-fn render_vitals_summary(frame: &mut Frame, rect: Rect, game_state_snapshot: &GameStateSnapshot) {
+fn render_vitals_summary(frame: &mut Frame, rect: Rect, client_game_state: &ClientGameState) {
+    let player = client_game_state.players.first().unwrap();
+
     let lines = [
-        format!("Week: {}", game_state_snapshot.week),
-        format!("CEO Public Opinion: {}", game_state_snapshot.public_opinion),
-        format!(
-            "Company Public Opinion: {}",
-            game_state_snapshot.public_opinion
-        ),
-        format!("CEO Reputation: {}", game_state_snapshot.reputation),
-        format!("Company Reputation: {}", game_state_snapshot.reputation),
+        format!("Week: {}", client_game_state.week),
+        format!("CEO Public Opinion: {}", player.perception.public_opinion),
+        format!("CEO Reputation: {}", player.perception.reputation),
     ];
 
     let block = Block::default().title("Vitals").borders(Borders::ALL);
@@ -66,34 +70,26 @@ fn render_vitals_summary(frame: &mut Frame, rect: Rect, game_state_snapshot: &Ga
     frame.render_widget(paragraph, rect);
 }
 
-fn render_financial_summary(
-    frame: &mut Frame,
-    rect: Rect,
-    game_state_snapshot: &GameStateSnapshot,
-) {
-    let lines = [
-        format!("Cash: ${}", game_state_snapshot.financials.actual_cash),
-        format!(
-            "Income: ${}",
-            game_state_snapshot.financials.this_weeks_income
-        ),
-        format!(
-            "Expenses: ${}",
-            game_state_snapshot.financials.this_weeks_expenses
-        ),
-        format!(
-            "Net Profit: ${}",
-            game_state_snapshot.financials.this_weeks_net_profit
-        ),
-    ];
+fn render_financial_summary(frame: &mut Frame, rect: Rect, client_game_state: &ClientGameState) {
+    client_game_state
+        .companies
+        .iter()
+        .for_each(|(_uuid, company)| {
+            let lines = [
+                format!("Cash: ${}", company.financials.actual_cash),
+                format!("Income: ${}", company.financials.this_weeks_income),
+                format!("Expenses: ${}", company.financials.this_weeks_expenses),
+                format!("Net Profit: ${}", company.financials.this_weeks_net_profit),
+            ];
 
-    let block = Block::default().title("Financials").borders(Borders::ALL);
+            let block = Block::default().title("Financials").borders(Borders::ALL);
 
-    let paragraph = Paragraph::new(lines.join(" | "))
-        .block(block)
-        .wrap(Wrap { trim: true });
+            let paragraph = Paragraph::new(lines.join(" | "))
+                .block(block)
+                .wrap(Wrap { trim: true });
 
-    frame.render_widget(paragraph, rect);
+            frame.render_widget(paragraph, rect);
+        });
 }
 
 fn render_tooltip(frame: &mut Frame, rect: Rect, route: &Route) {

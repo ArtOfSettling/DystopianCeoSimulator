@@ -1,39 +1,41 @@
-use crate::{Financials, OrgBudget};
+use crate::{GameState, HistoryState};
 use bevy::prelude::Resource;
-use std::collections::HashMap;
 use uuid::Uuid;
 
 #[derive(Resource)]
-pub struct Company {
-    pub reputation: i32,
-    pub public_opinion: i32,
-    pub financials: Financials,
+pub struct ServerGameState {
+    pub game_state: GameState,
 }
 
-#[derive(Default, Resource)]
-pub struct HistoricalData {
-    pub org_history: HashMap<Uuid, Vec<OrganizationHistoryEntry>>,
+#[derive(Resource)]
+pub struct ServerHistoryState {
+    pub history_state: HistoryState,
 }
 
-#[derive(Clone)]
-pub struct OrganizationHistoryEntry {
-    pub week: i32,
-    pub cash: i32,
-    pub income: i32,
-    pub expenses: i32,
-    pub net_profit: i32,
-    pub public_opinion: i32,
-    pub reputation: i32,
-    pub avg_employee_satisfaction: i32,
-    pub budgets: OrgBudget,
+impl Default for ServerGameState {
+    fn default() -> Self {
+        Self {
+            game_state: GameState {
+                week: 0,
+                players: Default::default(),
+                companies: Default::default(),
+                organizations: Default::default(),
+                entities: Default::default(),
+            },
+        }
+    }
 }
 
-#[derive(Resource, Default, Debug)]
-pub enum MenuState {
-    #[default]
-    AwaitingInput,
-    ProcessingAction,
-    DisplayingSummary,
+impl Default for ServerHistoryState {
+    fn default() -> Self {
+        Self {
+            history_state: HistoryState {
+                players: Default::default(),
+                organizations: Default::default(),
+                companies: Default::default(),
+            },
+        }
+    }
 }
 
 #[derive(Resource, Debug)]

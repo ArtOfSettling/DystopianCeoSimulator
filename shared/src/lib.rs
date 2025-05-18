@@ -1,8 +1,12 @@
-pub mod components;
+pub mod game_data;
+pub mod history_data;
 pub mod resources;
 
+use bevy::ecs::schedule::Or;
 use bevy::prelude::Resource;
-pub use components::*;
+use bevy::utils::HashMap;
+pub use game_data::*;
+pub use history_data::*;
 pub use resources::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -22,39 +26,36 @@ pub enum InternalEvent {
         organization_id: Uuid,
     },
     DecrementReputation {
-        amount: u32,
+        amount: i16,
     },
     DecrementMoney {
-        amount: u32,
+        amount: i32,
     },
     IncrementEmployeeSatisfaction {
         employee_id: Uuid,
-        amount: u32,
+        amount: u16,
     },
     IncrementOrgPublicOpinion {
         organization_id: Uuid,
-        amount: u32,
+        amount: i16,
     },
     IncrementOrgReputation {
         organization_id: Uuid,
-        amount: u32,
+        amount: i16,
     },
     IncrementSalary {
         employee_id: Uuid,
-        amount: u32,
+        amount: u16,
     },
     IncrementReputation {
-        amount: u32,
+        amount: i16,
     },
     IncrementMoney {
-        amount: u32,
-    },
-    RemoveOrgVp {
-        organization_id: Uuid,
+        amount: i32,
     },
     SetOrgVp {
         organization_id: Uuid,
-        employee_id: Uuid,
+        employee_id: Option<Uuid>,
     },
     SetOrgFinancials {
         organization_id: Uuid,
@@ -62,19 +63,28 @@ pub enum InternalEvent {
     },
     SetOrgInitiatives {
         organization_id: Uuid,
-        initiatives: Vec<OrgInitiative>,
+        initiatives: Vec<Initiative>,
     },
     SetOrgPublicOpinion {
         organization_id: Uuid,
-        reputation_delta: i32,
-        public_opinion_delta: i32,
+        perception: Perception,
     },
     SetOrgBudget {
         organization_id: Uuid,
-        organization_budget: OrgBudget,
+        budget: Budget,
+    },
+    SetOrganizationRole {
+        employee_id: Uuid,
+        new_role: OrganizationRole,
     },
     SetCompanyFinancials {
+        company_id: Uuid,
         financials: Financials,
+    },
+    AppendHistoryPoint {
+        new_player_history_points: HashMap<Uuid, HistoryPoint>,
+        new_organization_history_points: HashMap<Uuid, HistoryPoint>,
+        new_company_history_points: HashMap<Uuid, HistoryPoint>,
     },
     AdvanceWeek,
 }
@@ -83,94 +93,8 @@ pub enum InternalEvent {
 pub enum ServerEvent {
     None,
 
-    FullState(GameStateSnapshot),
-    HistoryState(HistoryStateSnapshot),
-}
-
-#[derive(Resource, Clone, Debug, Serialize, Deserialize)]
-pub enum UnemployedSnapshot {
-    UnemployedAnimalSnapshot(AnimalSnapshot),
-    UnemployedHumanSnapshot(HumanSnapshot),
-}
-
-#[derive(Resource, Clone, Debug, Serialize, Deserialize)]
-pub struct GameStateSnapshot {
-    pub week: u32,
-    pub reputation: i32,
-    pub public_opinion: i32,
-    pub company_reputation: i32,
-    pub company_public_opinion: i32,
-    pub financials: Financials,
-    pub organizations: Vec<OrganizationSnapshot>,
-    pub humans: Vec<HumanSnapshot>,
-    pub pets: Vec<AnimalSnapshot>,
-    pub unemployed: Vec<UnemployedSnapshot>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct OrganizationSnapshot {
-    pub id: Uuid,
-    pub name: String,
-    pub vp: Option<Uuid>,
-    pub budget: OrgBudget,
-    pub employees: Vec<EmployeeSnapshot>,
-    pub initiatives: Vec<OrgInitiative>,
-    pub financials: Financials,
-    pub reputation: i32,
-    pub public_opinion: i32,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct EmployeeSnapshot {
-    pub id: Uuid,
-    pub name: String,
-    pub level: u32,
-    pub satisfaction: i32,
-    pub salary: i32,
-    pub role: OrgRole,
-    pub entity_type: EntityType,
-    pub week_of_birth: i32,
-    pub organization_id: Option<Uuid>,
-    pub children_ids: Vec<Uuid>,
-    pub pet_ids: Vec<Uuid>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct HumanSnapshot {
-    pub id: Uuid,
-    pub name: String,
-    pub week_of_birth: i32,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AnimalSnapshot {
-    pub id: Uuid,
-    pub name: String,
-    pub entity_type: EntityType,
-    pub week_of_birth: i32,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct OrgHistoryPoint {
-    pub week: i32,
-    pub net_profit: i32,
-    pub cash: i32,
-    pub public_opinion: i32,
-    pub reputation: i32,
-    pub avg_employee_satisfaction: i32,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct OrgHistorySnapshot {
-    pub org_id: Uuid,
-    pub name: String,
-    pub recent_history: Vec<OrgHistoryPoint>,
-}
-
-#[derive(Resource, Clone, Debug, Serialize, Deserialize)]
-pub struct HistoryStateSnapshot {
-    pub week: i32,
-    pub organizations: Vec<OrgHistorySnapshot>,
+    FullState(GameState),
+    HistoryState(HistoryState),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -184,7 +108,7 @@ pub enum PlayerAction {
     },
     GiveRaise {
         employee_id: Uuid,
-        amount: u32,
+        amount: u16,
     },
     LaunchPRCampaign,
     DoNothing,
@@ -194,7 +118,7 @@ pub enum PlayerAction {
     },
     UpdateBudget {
         organization_id: Uuid,
-        organization_budget: OrgBudget,
+        organization_budget: Budget,
     },
 }
 

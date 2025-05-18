@@ -2,20 +2,20 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap};
-use shared::GameStateSnapshot;
+use renderer_api::ClientGameState;
 use uuid::Uuid;
 
 #[allow(clippy::too_many_arguments)]
 pub fn render_organization_budget(
-    game_state_snapshot: &GameStateSnapshot,
+    client_game_state: &ClientGameState,
     frame: &mut Frame,
     left_pane: &Rect,
     right_pane: &Rect,
-    org_id: &Uuid,
+    organization_id: &Uuid,
     selected_index: &usize,
-    marketing: &u32,
-    training: &u32,
-    rnd: &u32,
+    marketing: &u16,
+    training: &u16,
+    rnd: &u16,
 ) {
     let items = ["Marketing", "R&D", "Training"]
         .iter()
@@ -30,12 +30,11 @@ pub fn render_organization_budget(
             Block::default()
                 .title(format!(
                     "{} Budget Editor",
-                    game_state_snapshot
+                    client_game_state
                         .organizations
-                        .iter()
-                        .find(|org| org.id == *org_id)
-                        .unwrap()
-                        .name
+                        .get(organization_id)
+                        .map(|organization| organization.name.clone())
+                        .unwrap_or("ERROR".to_string())
                 ))
                 .borders(Borders::ALL),
         )

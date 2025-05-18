@@ -3,33 +3,52 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::prelude::{Color, Modifier, Style};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap};
-use shared::{
-    AnimalSnapshot, EmployeeSnapshot, GameStateSnapshot, HumanSnapshot, OrganizationSnapshot,
-};
+use renderer_api::ClientGameState;
+use shared::Organization;
 use uuid::Uuid;
 
 pub fn render_organization_details(
-    game_state_snapshot: &GameStateSnapshot,
+    client_game_state: &ClientGameState,
     frame: &mut Frame,
     left_pane: &Rect,
     right_pane: &Rect,
     org_id: &Uuid,
     selected_index: &usize,
 ) {
-    let org = game_state_snapshot
-        .organizations
-        .iter()
-        .find(|o| o.id == *org_id);
-    if let Some(org) = org {
-        draw_employee_list(frame, left_pane, org, *selected_index);
-        if let Some(emp) = org.employees.get(*selected_index) {
+    let organization = client_game_state.organizations.get(org_id).unwrap();
+    let employees = client_game_state
+        .ordered_employees_of_organization
+        .get(org_id);
+
+    draw_employee_list(
+        frame,
+        left_pane,
+        client_game_state,
+        organization,
+        employees,
+        *selected_index,
+    );
+
+    if let Some(employees) = employees {
+        if let Some(employee_id) = employees.get(*selected_index) {
+            let pets = client_game_state
+                .ordered_pets_of_entity
+                .get(employee_id)
+                .map(|v| v.as_slice())
+                .unwrap_or(&[]);
+            let children = client_game_state
+                .ordered_children_of_entity
+                .get(employee_id)
+                .map(|v| v.as_slice())
+                .unwrap_or(&[]);
             draw_employee_details(
                 frame,
                 right_pane,
-                game_state_snapshot.week as i32,
-                emp,
-                &game_state_snapshot.pets,
-                &game_state_snapshot.humans,
+                client_game_state.week as i32,
+                employee_id,
+                client_game_state,
+                pets,
+                children,
             );
         }
     }
@@ -38,69 +57,114 @@ pub fn render_organization_details(
 pub fn draw_employee_list(
     frame: &mut Frame,
     rect: &Rect,
-    org_snapshot: &OrganizationSnapshot,
+    client_game_state: &ClientGameState,
+    organization: &Organization,
+    employee_ids: Option<&Vec<Uuid>>,
     selected_index: usize,
 ) {
-    let items: Vec<ListItem> = org_snapshot
-        .employees
-        .iter()
-        .map(|e| ListItem::new(format!("{} (L{})", e.name, e.level)))
-        .collect();
+    if let Some(employee_ids) = employee_ids {
+        let employees: Vec<_> = employee_ids
+            .iter()
+            .map(|id| client_game_state.entities.get(id).unwrap())
+            .collect();
 
-    let mut state = ListState::default();
-    state.select(Some(selected_index));
+        let items: Vec<ListItem> = employees
+            .iter()
+            .map(|e| {
+                ListItem::new(format!(
+                    "{} (L{})",
+                    e.name,
+                    e.employment.clone().unwrap().level
+                ))
+            })
+            .collect();
 
-    let list = List::new(items)
-        .block(
-            Block::default()
-                .title(format!("{} Employees", org_snapshot.name))
-                .borders(Borders::ALL),
-        )
-        .highlight_style(
-            Style::default()
-                .bg(Color::Blue)
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
-        )
-        .highlight_symbol("➤ ");
+        let mut state = ListState::default();
+        state.select(Some(selected_index));
 
-    frame.render_stateful_widget(list, *rect, &mut state);
+        let list = List::new(items)
+            .block(
+                Block::default()
+                    .title(format!("{} Employees", organization.name))
+                    .borders(Borders::ALL),
+            )
+            .highlight_style(
+                Style::default()
+                    .bg(Color::Blue)
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .highlight_symbol("➤ ");
+
+        frame.render_stateful_widget(list, *rect, &mut state);
+    } else {
+        let mut state = ListState::default();
+        state.select(Some(0));
+
+        let list = List::new(["(No Employees)".to_string()])
+            .block(
+                Block::default()
+                    .title(format!("{} Employees", organization.name))
+                    .borders(Borders::ALL),
+            )
+            .highlight_style(
+                Style::default()
+                    .bg(Color::Blue)
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .highlight_symbol("➤ ");
+
+        frame.render_stateful_widget(list, *rect, &mut state);
+    }
 }
 
 pub fn draw_employee_details(
     frame: &mut Frame,
     rect: &Rect,
     current_week: i32,
-    employee_snapshot: &EmployeeSnapshot,
-    pets_snapshot: &[AnimalSnapshot],
-    children_snapshot: &[HumanSnapshot],
+    employee_id: &Uuid,
+    client_game_state: &ClientGameState,
+    pet_ids: &[Uuid],
+    child_ids: &[Uuid],
 ) {
-    let mut lines = vec![
-        format!("Name: {}", employee_snapshot.name),
-        format!(
-            "Age: {}",
-            get_age_description(current_week.saturating_sub(employee_snapshot.week_of_birth) as u32)
-        ),
-        format!("Type: {:?}", employee_snapshot.entity_type),
-        format!("Role: {:?}", employee_snapshot.role),
-        format!("Level: {}", employee_snapshot.level),
-        format!("Satisfaction: {}", employee_snapshot.satisfaction),
-        format!("Salary (p/w): ${}", employee_snapshot.salary),
-    ];
+    let employee = client_game_state.entities.get(employee_id).unwrap();
 
-    // Children
-    for child in children_snapshot
+    let pets: Vec<_> = pet_ids
         .iter()
-        .filter(|c| employee_snapshot.children_ids.contains(&c.id))
-    {
+        .map(|id| client_game_state.entities.get(id).unwrap())
+        .collect();
+
+    let children: Vec<_> = child_ids
+        .iter()
+        .map(|id| client_game_state.entities.get(id).unwrap())
+        .collect();
+
+    let mut lines: Vec<String>;
+    if let Some(employed) = employee.employment.clone() {
+        lines = vec![
+            format!("Name: {}", employee.name),
+            format!(
+                "Age: {}",
+                get_age_description(
+                    current_week.saturating_sub(employee.origin.week_of_birth as i32) as u32
+                )
+            ),
+            format!("Type: {:?}", employee.entity_type),
+            format!("Role: {:?}", employed.role),
+            format!("Level: {}", employed.level),
+            format!("Satisfaction: {}", employed.satisfaction),
+            format!("Salary (p/w): ${}", employed.salary),
+        ]
+    } else {
+        lines = vec!["Somehow rendering an unemployed employee as employed".to_string()]
+    }
+
+    for child in children {
         lines.push(format!("  └─ Child: {}", child.name));
     }
 
-    // Pets
-    for pet in pets_snapshot
-        .iter()
-        .filter(|p| employee_snapshot.pet_ids.contains(&p.id))
-    {
+    for pet in pets {
         lines.push(format!("  └─ Pet: {} ({:?})", pet.name, pet.entity_type));
     }
 

@@ -2,56 +2,55 @@ use crate::views::get_age_description;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Wrap};
-use ratatui::{Frame, widgets::Paragraph};
-use shared::{GameStateSnapshot, OrganizationSnapshot, UnemployedSnapshot};
+use ratatui::{widgets::Paragraph, Frame};
+use renderer_api::ClientGameState;
+use shared::Organization;
 use uuid::Uuid;
 
 pub fn render_hiring(
-    game_state_snapshot: &GameStateSnapshot,
+    client_game_state: &ClientGameState,
     frame: &mut Frame,
     left_pane: &Rect,
     right_pane: &Rect,
-    org_id: &Uuid,
+    organization_id: &Uuid,
     selected_index: &usize,
 ) {
-    let org = game_state_snapshot
+    let organization = client_game_state
         .organizations
-        .iter()
-        .find(|o| o.id == *org_id);
+        .get(organization_id)
+        .unwrap();
+
     draw_unemployed_list(
         frame,
         left_pane,
-        &game_state_snapshot.unemployed,
+        client_game_state,
+        &client_game_state.ordered_unemployed_entities,
         *selected_index,
     );
-    if let Some(person) = game_state_snapshot.unemployed.get(*selected_index) {
-        draw_candidate_details(
-            frame,
-            right_pane,
-            game_state_snapshot.week as i32,
-            person,
-            org.unwrap(),
-        );
+
+    if let Some(person) = client_game_state
+        .ordered_unemployed_entities
+        .get(*selected_index)
+    {
+        draw_candidate_details(frame, right_pane, client_game_state, person, organization);
     }
 }
 
 pub fn draw_unemployed_list(
     frame: &mut Frame,
     rect: &Rect,
-    unemployed_snapshot: &[UnemployedSnapshot],
+    client_game_state: &ClientGameState,
+    unemployed_ids: &[Uuid],
     selected_index: usize,
 ) {
-    let items: Vec<ListItem> = unemployed_snapshot
+    let unemployed: Vec<_> = unemployed_ids
         .iter()
-        .map(|p| {
-            ListItem::new(
-                (match p {
-                    UnemployedSnapshot::UnemployedAnimalSnapshot(animal) => animal.name.clone(),
-                    UnemployedSnapshot::UnemployedHumanSnapshot(human) => human.name.clone(),
-                })
-                .to_string(),
-            )
-        })
+        .map(|id| client_game_state.entities.get(id).unwrap())
+        .collect();
+
+    let items: Vec<ListItem> = unemployed
+        .iter()
+        .map(|p| ListItem::new(p.name.to_string()))
         .collect();
 
     let mut state = ListState::default();
@@ -77,35 +76,25 @@ pub fn draw_unemployed_list(
 pub fn draw_candidate_details(
     frame: &mut Frame,
     rect: &Rect,
-    current_week: i32,
-    unemployed_snapshot: &UnemployedSnapshot,
-    org_snapshot: &OrganizationSnapshot,
+    client_game_state: &ClientGameState,
+    unemployed_id: &Uuid,
+    organization: &Organization,
 ) {
+    let current_week = client_game_state.week as i32;
+    let unemployed = client_game_state.entities.get(unemployed_id).unwrap();
     let mut lines = Vec::new();
 
-    match unemployed_snapshot {
-        UnemployedSnapshot::UnemployedAnimalSnapshot(animal) => {
-            lines.push(format!("Name: {}", animal.name));
-            lines.push(format!("Type: {:?}", animal.entity_type));
-            lines.push(format!(
-                "Age: {}",
-                get_age_description(current_week.saturating_sub(animal.week_of_birth) as u32)
-            ));
-            lines.push(format!("ID: {}", animal.id));
-            lines.push("—".into());
-            lines.push(format!("Considering Org: {}", org_snapshot.name));
-        }
-        UnemployedSnapshot::UnemployedHumanSnapshot(human) => {
-            lines.push(format!("Name: {}", human.name));
-            lines.push(format!("ID: {}", human.id));
-            lines.push(format!(
-                "Age: {}",
-                get_age_description(current_week.saturating_sub(human.week_of_birth) as u32)
-            ));
-            lines.push("—".into());
-            lines.push(format!("Considering Org: {}", org_snapshot.name));
-        }
-    }
+    lines.push(format!("Name: {}", unemployed.name));
+    lines.push(format!("Type: {:?}", unemployed.entity_type));
+    lines.push(format!(
+        "Age: {}",
+        get_age_description(
+            current_week.saturating_sub(unemployed.origin.week_of_birth as i32) as u32
+        )
+    ));
+    lines.push(format!("ID: {}", unemployed.id));
+    lines.push("—".into());
+    lines.push(format!("Considering Org: {}", organization.name));
 
     let block = Block::default()
         .title("Candidate Details")

@@ -1178,6 +1178,7 @@ dependencies = [
  "futures",
  "input-api",
  "input-crossterm",
+ "renderer-api",
  "renderer-ratatui",
  "shared",
  "tracing",
@@ -2833,6 +2834,7 @@ dependencies = [
  "bevy",
  "input-api",
  "shared",
+ "uuid",
 ]
 
 [[package]]
@@ -2976,6 +2978,7 @@ dependencies = [
  "chrono",
  "clap",
  "futures",
+ "rand",
  "serde",
  "serde_json",
  "shared",

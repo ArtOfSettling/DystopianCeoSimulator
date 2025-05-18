@@ -7,10 +7,10 @@ use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::Tabs;
-use shared::GameStateSnapshot;
+use renderer_api::ClientGameState;
 
 pub fn render_organization_view(
-    game_state_snapshot: &GameStateSnapshot,
+    client_game_state: &ClientGameState,
     frame: &mut Frame,
     main_area: &Rect,
     organization_view: &OrganizationView,
@@ -32,7 +32,7 @@ pub fn render_organization_view(
 
     match organization_view.tab {
         OrganizationTab::Detail => render_organization_details(
-            game_state_snapshot,
+            client_game_state,
             frame,
             &left_pane,
             &right_pane,
@@ -40,7 +40,7 @@ pub fn render_organization_view(
             &organization_view.selected_index,
         ),
         OrganizationTab::Budget => render_organization_budget(
-            game_state_snapshot,
+            client_game_state,
             frame,
             &left_pane,
             &right_pane,
@@ -51,7 +51,7 @@ pub fn render_organization_view(
             &organization_view.rnd,
         ),
         OrganizationTab::Hiring => render_hiring(
-            game_state_snapshot,
+            client_game_state,
             frame,
             &left_pane,
             &right_pane,

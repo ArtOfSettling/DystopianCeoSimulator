@@ -1,15 +1,18 @@
 use crate::systems::ServerEventsReceiver;
 use bevy::ecs::system::SystemState;
 use bevy::prelude::{Commands, ResMut, World};
-use shared::{GameStateSnapshot, HistoryStateSnapshot, ServerEvent};
+use renderer_api::{ClientGameState, ClientHistoryState};
+use shared::{EntityType, ServerEvent};
+use std::collections::HashMap;
 use tracing::{debug, info};
+use uuid::Uuid;
 
 pub fn process_server_events(
     world: &mut World,
     params: &mut SystemState<(
         ResMut<ServerEventsReceiver>,
-        ResMut<GameStateSnapshot>,
-        ResMut<HistoryStateSnapshot>,
+        ResMut<ClientGameState>,
+        ResMut<ClientHistoryState>,
         Commands,
     )>,
 ) {
@@ -26,21 +29,96 @@ pub fn process_server_events(
 
     match received.unwrap() {
         ServerEvent::None => info!("Client has an empty server event"),
-        ServerEvent::FullState(rx_game_state_snapshot) => {
-            game_state_snapshot.week = rx_game_state_snapshot.week;
-            game_state_snapshot.public_opinion = rx_game_state_snapshot.public_opinion;
-            game_state_snapshot.reputation = rx_game_state_snapshot.reputation;
-            game_state_snapshot.company_public_opinion =
-                rx_game_state_snapshot.company_public_opinion;
-            game_state_snapshot.company_reputation = rx_game_state_snapshot.company_reputation;
-            game_state_snapshot.financials = rx_game_state_snapshot.financials;
-            game_state_snapshot.organizations = rx_game_state_snapshot.organizations;
-            game_state_snapshot.pets = rx_game_state_snapshot.pets;
-            game_state_snapshot.humans = rx_game_state_snapshot.humans;
-            game_state_snapshot.unemployed = rx_game_state_snapshot.unemployed;
+        ServerEvent::FullState(rx_game_state) => {
+            game_state_snapshot.week = rx_game_state.week;
+            game_state_snapshot.players = rx_game_state.players;
+            game_state_snapshot.companies = rx_game_state.companies;
+            game_state_snapshot.organizations = rx_game_state.organizations;
+            game_state_snapshot.entities = rx_game_state.entities;
+
+            let mut ordered_organizations_of_company: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
+            let mut ordered_employees_of_organization: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
+            let mut ordered_employees_of_company: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
+            let mut ordered_unemployed_entities: Vec<Uuid> = vec![];
+            let mut ordered_pets_of_entity: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
+            let mut ordered_children_of_entity: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
+
+            for entity in game_state_snapshot.entities.values() {
+                // Employment relationships
+                if let Some(employment) = &entity.employment {
+                    // By organization
+                    ordered_employees_of_organization
+                        .entry(employment.organization_id)
+                        .or_default()
+                        .push(entity.id.clone());
+
+                    // By company (via organization -> company_relation)
+                    if let Some(org) = game_state_snapshot
+                        .organizations
+                        .get(&employment.organization_id)
+                    {
+                        ordered_employees_of_company
+                            .entry(org.company_relation.entity_id)
+                            .or_default()
+                            .push(entity.id.clone());
+                    }
+                } else {
+                    // Unemployed
+                    ordered_unemployed_entities.push(entity.id.clone());
+                }
+
+                // Ownership relationships (for pets and children)
+                if let Some(owner) = &entity.owner {
+                    match entity.entity_type {
+                        EntityType::Human => {
+                            ordered_children_of_entity
+                                .entry(owner.entity_id)
+                                .or_default()
+                                .push(entity.id.clone());
+                        }
+                        _ => {
+                            ordered_pets_of_entity
+                                .entry(owner.entity_id)
+                                .or_default()
+                                .push(entity.id.clone());
+                        }
+                    }
+                }
+            }
+
+            for (_organization_id, organization) in game_state_snapshot.organizations.clone() {
+                ordered_organizations_of_company
+                    .entry(organization.company_relation.entity_id)
+                    .or_default()
+                    .push(organization.id.clone());
+            }
+
+            for list in ordered_organizations_of_company.values_mut() {
+                list.sort_by_key(|e| e.clone());
+            }
+            for list in ordered_employees_of_organization.values_mut() {
+                list.sort_by_key(|e| e.clone());
+            }
+            for list in ordered_employees_of_company.values_mut() {
+                list.sort_by_key(|e| e.clone());
+            }
+            for list in ordered_pets_of_entity.values_mut() {
+                list.sort_by_key(|e| e.clone());
+            }
+            for list in ordered_children_of_entity.values_mut() {
+                list.sort_by_key(|e| e.clone());
+            }
+
+            ordered_unemployed_entities.sort_by_key(|e| e.clone());
+
+            game_state_snapshot.ordered_organizations_of_company = ordered_organizations_of_company;
+            game_state_snapshot.ordered_employees_of_organization =
+                ordered_employees_of_organization;
+            game_state_snapshot.ordered_employees_of_company = ordered_employees_of_company;
+            game_state_snapshot.ordered_unemployed_entities = ordered_unemployed_entities;
+            game_state_snapshot.ordered_pets_of_entity = ordered_pets_of_entity;
+            game_state_snapshot.ordered_children_of_entity = ordered_children_of_entity;
         }
-        ServerEvent::HistoryState(rx_history_snapshot) => {
-            *history_state_snapshot = rx_history_snapshot;
-        }
+        ServerEvent::HistoryState(rx_history) => history_state_snapshot.history_state = rx_history,
     }
 }

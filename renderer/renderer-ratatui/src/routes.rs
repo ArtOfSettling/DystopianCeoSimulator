@@ -17,9 +17,9 @@ pub struct OrganizationView {
     pub selected_index: usize,
     pub organization_id: Uuid,
     pub tab: OrganizationTab,
-    pub marketing: u32,
-    pub rnd: u32,
-    pub training: u32,
+    pub marketing: u16,
+    pub rnd: u16,
+    pub training: u16,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

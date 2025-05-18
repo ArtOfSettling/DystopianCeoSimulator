@@ -48,7 +48,8 @@ fn main() -> anyhow::Result<()> {
         .add_plugins(MinimalPlugins.set(ScheduleRunnerPlugin::run_loop(Duration::from_millis(10))))
         .add_plugins(AsyncStdReadySignalPlugin { port: 5555 })
         .insert_resource(Time::<Fixed>::from_hz(128.0))
-        .insert_resource(HistoricalData::default())
+        .insert_resource(ServerGameState::default())
+        .insert_resource(ServerHistoryState::default())
         .insert_resource(NeedsWorldBroadcast::default())
         .insert_resource(NeedsStateUpdate::default())
         .insert_resource(InternalEventSender { tx_internal_events })
@@ -130,7 +131,7 @@ use async_channel::{Receiver, Sender, unbounded};
 use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use clap::Parser;
-use shared::{HistoricalData, InternalEvent};
+use shared::{InternalEvent, ServerGameState, ServerHistoryState};
 use std::fs::read_dir;
 use std::path::PathBuf;
 
