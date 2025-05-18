@@ -22,6 +22,9 @@ pub enum PlayerInputAction {
     MenuLeft,
     MenuRight,
     MenuSelect,
+    MenuCommit,
     MenuBack,
     MenuChangeTab,
+    MenuIncrement,
+    MenuDecrement,
 }

@@ -1,7 +1,7 @@
 use bevy::prelude::Commands;
 use shared::{
     CatBreed, Company, DogBreed, Employed, EmployeeFlag, EmployeeFlags, EntityType, Financials,
-    HorseBreed, InternalEntity, Level, LizardBreed, Money, Name, OrgInitiative, OrgRole,
+    HorseBreed, InternalEntity, Level, LizardBreed, Money, Name, OrgBudget, OrgInitiative, OrgRole,
     Organization, Owner, Player, Productivity, PublicOpinion, Reputation, Salary, Satisfaction,
     Type, Week, WeekOfBirth,
 };
@@ -43,6 +43,11 @@ pub fn setup_world_state(mut commands: Commands) {
                 this_weeks_net_profit: 0,
                 actual_cash: 256_227,
             },
+            budget: OrgBudget {
+                marketing: 100,
+                rnd: 100,
+                training: 100,
+            },
         },
         Reputation(50),
         PublicOpinion(50),
@@ -61,6 +66,11 @@ pub fn setup_world_state(mut commands: Commands) {
                 this_weeks_expenses: 0,
                 this_weeks_net_profit: 0,
                 actual_cash: 709_991,
+            },
+            budget: OrgBudget {
+                marketing: 100,
+                rnd: 100,
+                training: 100,
             },
         },
         Reputation(50),

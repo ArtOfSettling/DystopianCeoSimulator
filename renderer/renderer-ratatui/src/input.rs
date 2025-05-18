@@ -2,13 +2,14 @@ use crate::navigation::{NavigationAction, NavigationStack};
 use crate::routes::{OrganizationList, OrganizationTab, OrganizationView, Route};
 use bevy::prelude::ResMut;
 use input_api::PlayerInputAction;
-use shared::{GameStateSnapshot, PendingPlayerAction, PlayerAction, UnemployedSnapshot};
+use shared::{GameStateSnapshot, OrgBudget, PendingPlayerAction, PlayerAction, UnemployedSnapshot};
 
 fn try_switch_tab(current: &Route) -> Option<Route> {
     match current {
         Route::OrganizationView { data } => {
             let next_tab = match data.tab {
-                OrganizationTab::Detail => OrganizationTab::Hiring,
+                OrganizationTab::Detail => OrganizationTab::Budget,
+                OrganizationTab::Budget => OrganizationTab::Hiring,
                 OrganizationTab::Hiring => OrganizationTab::Detail,
             };
             Some(Route::OrganizationView {
@@ -16,6 +17,9 @@ fn try_switch_tab(current: &Route) -> Option<Route> {
                     organization_id: data.organization_id,
                     selected_index: 0,
                     tab: next_tab,
+                    marketing: data.marketing,
+                    rnd: data.rnd,
+                    training: data.training,
                 },
             })
         }
@@ -49,6 +53,24 @@ pub fn handle_input(
                             .unwrap()
                             .id,
                         tab: OrganizationTab::Detail,
+                        marketing: game_state_snapshot
+                            .organizations
+                            .get(data.selected_index)
+                            .unwrap()
+                            .budget
+                            .marketing,
+                        rnd: game_state_snapshot
+                            .organizations
+                            .get(data.selected_index)
+                            .unwrap()
+                            .budget
+                            .rnd,
+                        training: game_state_snapshot
+                            .organizations
+                            .get(data.selected_index)
+                            .unwrap()
+                            .budget
+                            .training,
                     },
                 })
                 .apply(nav);
@@ -162,12 +184,51 @@ impl InputHandler for OrganizationView {
 
                 _ => None,
             },
+            OrganizationTab::Budget => match action {
+                PlayerInputAction::MenuDown => {
+                    let budget_entries = 3;
+                    self.selected_index = (self.selected_index + 1).min(budget_entries - 1);
+                    None
+                }
+                PlayerInputAction::MenuUp => {
+                    self.selected_index = self.selected_index.saturating_sub(1);
+                    None
+                }
+                PlayerInputAction::MenuDecrement => {
+                    match self.selected_index {
+                        0 => self.marketing -= 1,
+                        1 => self.rnd -= 1,
+                        2 => self.training -= 1,
+                        _ => {}
+                    }
+                    None
+                }
+                PlayerInputAction::MenuIncrement => {
+                    match self.selected_index {
+                        0 => self.marketing += 1,
+                        1 => self.rnd += 1,
+                        2 => self.training += 1,
+                        _ => {}
+                    }
+                    None
+                }
+                PlayerInputAction::MenuCommit => Some(PlayerAction::UpdateBudget {
+                    organization_id: self.organization_id,
+                    organization_budget: OrgBudget {
+                        marketing: self.marketing,
+                        rnd: self.rnd,
+                        training: self.training,
+                    },
+                }),
+                _ => None,
+            },
             OrganizationTab::Hiring => match action {
                 PlayerInputAction::MenuDown => {
                     let unemployed_count = game_state_snapshot.unemployed.len();
                     self.selected_index = (self.selected_index + 1).min(unemployed_count - 1);
                     None
                 }
+
                 PlayerInputAction::MenuUp => {
                     self.selected_index = self.selected_index.saturating_sub(1);
                     None

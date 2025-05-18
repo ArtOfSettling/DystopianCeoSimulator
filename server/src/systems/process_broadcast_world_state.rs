@@ -97,6 +97,7 @@ pub fn process_broadcast_world_state(
             id: org.id,
             name: org.name.clone(),
             vp: org.vp,
+            budget: org.budget.clone(),
             employees: org_map.remove(&org.id).unwrap_or_default(),
             initiatives: org.initiatives.clone(),
             financials: org.financials.clone(),

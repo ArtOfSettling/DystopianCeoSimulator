@@ -1,4 +1,5 @@
 use crate::routes::{OrganizationTab, OrganizationView};
+use crate::views::organization_budget::render_organization_budget;
 use crate::views::organization_details::render_organization_details;
 use crate::views::render_hiring;
 use ratatui::Frame;
@@ -38,6 +39,17 @@ pub fn render_organization_view(
             &organization_view.organization_id,
             &organization_view.selected_index,
         ),
+        OrganizationTab::Budget => render_organization_budget(
+            game_state_snapshot,
+            frame,
+            &left_pane,
+            &right_pane,
+            &organization_view.organization_id,
+            &organization_view.selected_index,
+            &organization_view.marketing,
+            &organization_view.training,
+            &organization_view.rnd,
+        ),
         OrganizationTab::Hiring => render_hiring(
             game_state_snapshot,
             frame,
@@ -50,14 +62,15 @@ pub fn render_organization_view(
 }
 
 fn draw_tab_header(frame: &mut Frame, rect: Rect, active_tab: OrganizationTab) {
-    let titles = vec!["Detail", "Hiring"]
+    let titles = vec!["Detail", "Budget", "Hiring"]
         .into_iter()
         .map(Line::from)
         .collect::<Vec<Line>>();
 
     let selected_index = match active_tab {
         OrganizationTab::Detail => 0,
-        OrganizationTab::Hiring => 1,
+        OrganizationTab::Budget => 1,
+        OrganizationTab::Hiring => 2,
     };
 
     let tabs = Tabs::new(titles)

@@ -108,6 +108,28 @@ pub fn process_internal_events(
                 }
             }
 
+            InternalEvent::IncrementOrgPublicOpinion {
+                organization_id,
+                amount,
+            } => {
+                for (org, _, mut public_opinion) in organizations.iter_mut(world) {
+                    if org.id == organization_id {
+                        public_opinion.0 += amount as i32;
+                    }
+                }
+            }
+
+            InternalEvent::IncrementOrgReputation {
+                organization_id,
+                amount,
+            } => {
+                for (org, mut reputation, _) in organizations.iter_mut(world) {
+                    if org.id == organization_id {
+                        reputation.0 += amount as i32;
+                    }
+                }
+            }
+
             InternalEvent::IncrementSalary {
                 employee_id,
                 amount,
@@ -205,6 +227,20 @@ pub fn process_internal_events(
                     if org.id == organization_id {
                         reputation.0 += reputation_delta;
                         public_opinion.0 += public_opinion_delta;
+                        break;
+                    }
+                }
+            }
+
+            InternalEvent::SetOrgBudget {
+                organization_id,
+                organization_budget,
+            } => {
+                for (mut org, _, _) in organizations.iter_mut(world) {
+                    if org.id == organization_id {
+                        org.budget.marketing = organization_budget.marketing;
+                        org.budget.rnd = organization_budget.rnd;
+                        org.budget.training = organization_budget.training;
                         break;
                     }
                 }
