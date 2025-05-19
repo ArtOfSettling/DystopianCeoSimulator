@@ -67,8 +67,8 @@ impl Renderer for RatatuiRenderer {
         mut exit_writer: EventWriter<AppExit>,
     ) {
         if let Err(e) = self.try_draw_frame(
-            &client_game_state,
-            &client_history_state,
+            client_game_state,
+            client_history_state,
             &mut pending_player_input_action,
             &mut pending_player_action,
             &mut exit_writer,

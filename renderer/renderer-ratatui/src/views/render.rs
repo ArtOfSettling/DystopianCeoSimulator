@@ -43,7 +43,7 @@ pub fn render(
             client_history_state,
             frame,
             &main_area,
-            &company_id,
+            company_id,
             &data.selected_index,
         ),
         Route::OrganizationView { data } => {

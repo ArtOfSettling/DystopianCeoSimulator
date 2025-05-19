@@ -1,7 +1,7 @@
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Block, Borders, Sparkline, Wrap};
-use ratatui::{widgets::Paragraph, Frame};
+use ratatui::{Frame, widgets::Paragraph};
 use renderer_api::{ClientGameState, ClientHistoryState};
 use shared::{HistoryPoint, Initiative, OrganizationHistory};
 use uuid::Uuid;
@@ -38,17 +38,17 @@ pub fn render_organization_list(
             frame,
             &left_pane,
             client_game_state,
-            &organization_ids,
+            organization_ids,
             *selected_index,
         );
 
-        let organization_id = &organization_ids[*selected_index];
-        render_organization_summary(frame, &top_pane, client_game_state, organization_id);
+        let organization_id = organization_ids[*selected_index];
+        render_organization_summary(frame, &top_pane, client_game_state, &organization_id);
         let history = client_history_state
             .history_state
             .organizations
             .iter()
-            .find(|(id, _organization)| *id == organization_id);
+            .find(|(id, _organization)| **id == organization_id);
         if let Some((_organization_id, organization_history)) = history {
             render_history_graphs(frame, &bottom_pane, organization_history);
         }
@@ -76,7 +76,12 @@ pub fn render_organizations(
 
     let items: Vec<ListItem> = organizations
         .iter()
-        .map(|org| ListItem::new(format!("Org: {}", org.name)))
+        .map(|organization| {
+            ListItem::new(format!(
+                "{}: ({:?})",
+                organization.name, organization.organization_type
+            ))
+        })
         .collect();
 
     let mut state = ListState::default();
@@ -110,7 +115,8 @@ pub fn render_organization_summary(
         .get(organization_id)
         .unwrap();
     let mut lines = vec![
-        format!("Org Name: {}", organization.name),
+        format!("Name: {}", organization.name),
+        format!("Type: {:?}", organization.organization_type),
         format!(
             "VP: {}",
             organization.vp.map_or("Vacant".to_string(), |id| {
@@ -200,7 +206,7 @@ fn render_history_graphs(
     frame.render_widget(
         Sparkline::default()
             .block(Block::default().title("Net Profit"))
-            .data(&history(|h| h.financials.this_weeks_net_profit))
+            .data(history(|h| h.financials.this_weeks_net_profit))
             .style(Style::default().fg(Color::Green)),
         chunks[0],
     );
@@ -208,7 +214,7 @@ fn render_history_graphs(
     frame.render_widget(
         Sparkline::default()
             .block(Block::default().title("Cash"))
-            .data(&history(|h| h.financials.actual_cash))
+            .data(history(|h| h.financials.actual_cash))
             .style(Style::default().fg(Color::Yellow)),
         chunks[1],
     );
@@ -216,7 +222,7 @@ fn render_history_graphs(
     frame.render_widget(
         Sparkline::default()
             .block(Block::default().title("Public Opinion"))
-            .data(&history(|h| h.perception.public_opinion as i32))
+            .data(history(|h| h.perception.public_opinion as i32))
             .style(Style::default().fg(Color::Cyan)),
         chunks[2],
     );
@@ -224,7 +230,7 @@ fn render_history_graphs(
     frame.render_widget(
         Sparkline::default()
             .block(Block::default().title("Reputation"))
-            .data(&history(|h| h.perception.reputation as i32))
+            .data(history(|h| h.perception.reputation as i32))
             .style(Style::default().fg(Color::Magenta)),
         chunks[3],
     );
@@ -232,7 +238,7 @@ fn render_history_graphs(
     frame.render_widget(
         Sparkline::default()
             .block(Block::default().title("Satisfaction"))
-            .data(&history(|h| h.avg_employee_satisfaction as i32))
+            .data(history(|h| h.avg_employee_satisfaction as i32))
             .style(Style::default().fg(Color::Blue)),
         chunks[4],
     );

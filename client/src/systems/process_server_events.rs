@@ -1,23 +1,17 @@
 use crate::systems::ServerEventsReceiver;
-use bevy::ecs::system::SystemState;
-use bevy::prelude::{Commands, ResMut, World};
+use bevy::prelude::{Res, ResMut};
 use renderer_api::{ClientGameState, ClientHistoryState};
 use shared::{EntityType, ServerEvent};
+use std::cmp::Reverse;
 use std::collections::HashMap;
 use tracing::{debug, info};
 use uuid::Uuid;
 
 pub fn process_server_events(
-    world: &mut World,
-    params: &mut SystemState<(
-        ResMut<ServerEventsReceiver>,
-        ResMut<ClientGameState>,
-        ResMut<ClientHistoryState>,
-        Commands,
-    )>,
+    server_events_receiver: Res<ServerEventsReceiver>,
+    mut game_state_snapshot: ResMut<ClientGameState>,
+    mut history_state_snapshot: ResMut<ClientHistoryState>,
 ) {
-    let (server_events_receiver, mut game_state_snapshot, mut history_state_snapshot, _) =
-        params.get_mut(world);
     let received = server_events_receiver.rx_server_events.try_recv();
     if received.is_err() {
         debug!(
@@ -50,7 +44,7 @@ pub fn process_server_events(
                     ordered_employees_of_organization
                         .entry(employment.organization_id)
                         .or_default()
-                        .push(entity.id.clone());
+                        .push(entity.id);
 
                     // By company (via organization -> company_relation)
                     if let Some(org) = game_state_snapshot
@@ -60,27 +54,27 @@ pub fn process_server_events(
                         ordered_employees_of_company
                             .entry(org.company_relation.entity_id)
                             .or_default()
-                            .push(entity.id.clone());
+                            .push(entity.id);
                     }
                 } else {
                     // Unemployed
-                    ordered_unemployed_entities.push(entity.id.clone());
+                    ordered_unemployed_entities.push(entity.id);
                 }
 
                 // Ownership relationships (for pets and children)
                 if let Some(owner) = &entity.owner {
                     match entity.entity_type {
-                        EntityType::Human => {
+                        EntityType::Human(_) => {
                             ordered_children_of_entity
                                 .entry(owner.entity_id)
                                 .or_default()
-                                .push(entity.id.clone());
+                                .push(entity.id);
                         }
                         _ => {
                             ordered_pets_of_entity
                                 .entry(owner.entity_id)
                                 .or_default()
-                                .push(entity.id.clone());
+                                .push(entity.id);
                         }
                     }
                 }
@@ -90,26 +84,56 @@ pub fn process_server_events(
                 ordered_organizations_of_company
                     .entry(organization.company_relation.entity_id)
                     .or_default()
-                    .push(organization.id.clone());
+                    .push(organization.id);
             }
 
             for list in ordered_organizations_of_company.values_mut() {
-                list.sort_by_key(|e| e.clone());
+                list.sort_by_key(|e| {
+                    game_state_snapshot
+                        .organizations
+                        .get(e)
+                        .unwrap()
+                        .name
+                        .clone()
+                });
             }
             for list in ordered_employees_of_organization.values_mut() {
-                list.sort_by_key(|e| e.clone());
+                list.sort_by_key(|e| {
+                    Reverse(
+                        game_state_snapshot
+                            .entities
+                            .get(e)
+                            .unwrap()
+                            .clone()
+                            .employment
+                            .unwrap()
+                            .level,
+                    )
+                });
             }
             for list in ordered_employees_of_company.values_mut() {
-                list.sort_by_key(|e| e.clone());
+                list.sort_by_key(|e| {
+                    Reverse(
+                        game_state_snapshot
+                            .entities
+                            .get(e)
+                            .unwrap()
+                            .clone()
+                            .employment
+                            .unwrap()
+                            .level,
+                    )
+                });
             }
             for list in ordered_pets_of_entity.values_mut() {
-                list.sort_by_key(|e| e.clone());
+                list.sort_by_key(|e| game_state_snapshot.entities.get(e).unwrap().name.clone());
             }
             for list in ordered_children_of_entity.values_mut() {
-                list.sort_by_key(|e| e.clone());
+                list.sort_by_key(|e| game_state_snapshot.entities.get(e).unwrap().name.clone());
             }
 
-            ordered_unemployed_entities.sort_by_key(|e| e.clone());
+            ordered_unemployed_entities
+                .sort_by_key(|e| game_state_snapshot.entities.get(e).unwrap().name.clone());
 
             game_state_snapshot.ordered_organizations_of_company = ordered_organizations_of_company;
             game_state_snapshot.ordered_employees_of_organization =

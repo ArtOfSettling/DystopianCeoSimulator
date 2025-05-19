@@ -34,7 +34,7 @@ pub fn process_internal_events(
                 if let Some(entity) = server_game_state.game_state.entities.get_mut(&employee_id) {
                     entity.employment = Some(Employment {
                         organization_id,
-                        role: OrganizationRole::Worker,
+                        role: OrganizationRole::SalesRep,
                         employee_flags: vec![],
                         level: 10_000,
                         salary: 7_000,
@@ -128,10 +128,10 @@ pub fn process_internal_events(
                     organization.vp = employee_id;
                 }
             }
-            
+
             InternalEvent::SetOrganizationRole {
                 employee_id,
-                new_role
+                new_role,
             } => {
                 if let Some(entity) = server_game_state.game_state.entities.get_mut(&employee_id) {
                     if let Some(employment) = &mut entity.employment {

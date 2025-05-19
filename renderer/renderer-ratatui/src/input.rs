@@ -52,7 +52,7 @@ pub fn handle_input(
                         organization_id: client_game_state
                             .ordered_organizations_of_company
                             .get(company_id)
-                            .map(|organizations| organizations[data.selected_index].clone())
+                            .map(|organizations| organizations[data.selected_index])
                             .unwrap(),
                         tab: OrganizationTab::Detail,
                         marketing: client_game_state
@@ -61,7 +61,7 @@ pub fn handle_input(
                                 &client_game_state
                                     .ordered_organizations_of_company
                                     .get(company_id)
-                                    .map(|organizations| organizations[data.selected_index].clone())
+                                    .map(|organizations| organizations[data.selected_index])
                                     .unwrap(),
                             )
                             .unwrap()
@@ -73,7 +73,7 @@ pub fn handle_input(
                                 &client_game_state
                                     .ordered_organizations_of_company
                                     .get(company_id)
-                                    .map(|organizations| organizations[data.selected_index].clone())
+                                    .map(|organizations| organizations[data.selected_index])
                                     .unwrap(),
                             )
                             .unwrap()
@@ -85,7 +85,7 @@ pub fn handle_input(
                                 &client_game_state
                                     .ordered_organizations_of_company
                                     .get(company_id)
-                                    .map(|organizations| organizations[data.selected_index].clone())
+                                    .map(|organizations| organizations[data.selected_index])
                                     .unwrap(),
                             )
                             .unwrap()
@@ -184,34 +184,22 @@ impl InputHandler for OrganizationView {
                     }
                 }
 
-                PlayerInputAction::SelectEmployeeForRaise => {
-                    if let Some(employee_id) = client_game_state
-                        .ordered_employees_of_organization
-                        .get(&self.organization_id)?
-                        .get(self.selected_index)
-                    {
-                        Some(PlayerAction::GiveRaise {
-                            employee_id: *employee_id,
-                            amount: 1_000,
-                        })
-                    } else {
-                        None
-                    }
-                }
+                PlayerInputAction::SelectEmployeeForRaise => client_game_state
+                    .ordered_employees_of_organization
+                    .get(&self.organization_id)?
+                    .get(self.selected_index)
+                    .map(|employee_id| PlayerAction::GiveRaise {
+                        employee_id: *employee_id,
+                        amount: 1_000,
+                    }),
 
-                PlayerInputAction::SelectEmployeeToFire => {
-                    if let Some(employee_id) = client_game_state
-                        .ordered_employees_of_organization
-                        .get(&self.organization_id)?
-                        .get(self.selected_index)
-                    {
-                        Some(PlayerAction::FireEmployee {
-                            employee_id: *employee_id,
-                        })
-                    } else {
-                        None
-                    }
-                }
+                PlayerInputAction::SelectEmployeeToFire => client_game_state
+                    .ordered_employees_of_organization
+                    .get(&self.organization_id)?
+                    .get(self.selected_index)
+                    .map(|employee_id| PlayerAction::FireEmployee {
+                        employee_id: *employee_id,
+                    }),
 
                 _ => None,
             },

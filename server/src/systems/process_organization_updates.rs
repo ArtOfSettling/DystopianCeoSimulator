@@ -20,7 +20,7 @@ pub fn process_organization_updates(
                 entity
                     .employment
                     .as_ref()
-                    .map_or(false, |e| e.organization_id == *organization_id)
+                    .is_some_and(|e| e.organization_id == *organization_id)
             })
             .collect();
 
