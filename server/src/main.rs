@@ -1,4 +1,5 @@
 mod cli;
+mod deterministic_randomization;
 mod internal_commands;
 mod plugins;
 mod systems;

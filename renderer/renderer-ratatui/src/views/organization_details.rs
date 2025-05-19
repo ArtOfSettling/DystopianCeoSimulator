@@ -144,18 +144,29 @@ pub fn draw_employee_details(
     if let Some(employed) = employee.employment.clone() {
         lines = vec![
             format!("Name: {}", employee.name),
+            format!("Type: {:?}", employee.entity_type),
             format!(
                 "Age: {}",
                 get_age_description(
                     current_week.saturating_sub(employee.origin.week_of_birth as i32) as u32
                 )
             ),
-            format!("Type: {:?}", employee.entity_type),
             format!("Role: {:?}", employed.role),
             format!("Level: {}", employed.level),
             format!("Satisfaction: {}", employed.satisfaction),
             format!("Salary (p/w): ${}", employed.salary),
-        ]
+        ];
+
+        // Show traits/flags if any
+        if !employee.flags.is_empty() {
+            let traits_str = employee
+                .flags
+                .iter()
+                .map(|flag| format!("{:?}", flag))
+                .collect::<Vec<_>>()
+                .join(", ");
+            lines.push(format!("Traits: {}", traits_str));
+        }
     } else {
         lines = vec!["Somehow rendering an unemployed employee as employed".to_string()]
     }

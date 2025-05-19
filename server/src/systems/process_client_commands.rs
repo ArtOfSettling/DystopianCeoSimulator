@@ -1,9 +1,10 @@
 use crate::systems::FanOutClientCommandReceiver;
 use crate::{InternalEventSender, NeedsStateUpdate};
 use bevy::prelude::{Res, ResMut};
-use bevy::tasks::futures_lite::stream::or;
 use bevy::utils::HashMap;
-use shared::{ClientCommand, HistoryPoint, InternalEvent, OrganizationRole, PlayerAction, ServerGameState};
+use shared::{
+    ClientCommand, HistoryPoint, InternalEvent, OrganizationRole, PlayerAction, ServerGameState,
+};
 use tracing::info;
 use uuid::Uuid;
 
@@ -22,12 +23,13 @@ pub fn process_client_commands(
         match client_command {
             ClientCommand::PlayerAction(player_action) => match player_action {
                 PlayerAction::FireEmployee { employee_id } => {
-                    if let Some(employee) = server_game_state.game_state.entities.get(&employee_id) {
+                    if let Some(employee) = server_game_state.game_state.entities.get(&employee_id)
+                    {
                         info!("Firing employee: {}", employee.name);
 
-                        let _ = internal_event_sender.tx_internal_events.try_send(
-                            InternalEvent::RemoveEmployedStatus { employee_id },
-                        );
+                        let _ = internal_event_sender
+                            .tx_internal_events
+                            .try_send(InternalEvent::RemoveEmployedStatus { employee_id });
 
                         for (org_id, org) in &server_game_state.game_state.organizations {
                             if org.vp == Some(employee_id) {
@@ -132,7 +134,7 @@ pub fn process_client_commands(
                             .tx_internal_events
                             .try_send(InternalEvent::SetOrganizationRole {
                                 employee_id,
-                                new_role: OrganizationRole::Manager,
+                                new_role: OrganizationRole::HRManager,
                             })
                             .unwrap();
                     }
@@ -159,24 +161,26 @@ pub fn process_client_commands(
             },
         }
 
-        let total_productivity: u16 = server_game_state
+        let total_productivity: i32 = server_game_state
             .game_state
             .entities
             .values()
-            .filter_map(|entity| entity.employment.as_ref().map(|e| e.satisfaction))
+            .filter(|entity| entity.employment.is_some())
+            .filter_map(|entity| entity.employment.as_ref().map(|e| e.satisfaction as i32))
             .sum();
 
         let total_expenses = server_game_state
             .game_state
             .entities
             .values()
+            .filter(|entity| entity.employment.is_some())
             .filter_map(|entity| entity.employment.as_ref().map(|e| e.salary as i32))
             .sum();
 
         internal_event_sender
             .tx_internal_events
             .try_send(InternalEvent::IncrementMoney {
-                amount: total_productivity as i32,
+                amount: total_productivity,
             })
             .unwrap();
 

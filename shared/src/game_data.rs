@@ -35,7 +35,7 @@ pub struct Owner {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Origin {
-    pub week_of_birth: u16,
+    pub week_of_birth: i16,
 }
 
 #[derive(Default, Clone, Debug, Serialize, Deserialize)]
@@ -62,6 +62,8 @@ pub struct Budget {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Company {
     pub id: Uuid,
+    pub name: String,
+    pub company_type: CompanyType,
     pub perception: Perception,
     pub financials: Financials,
 }
@@ -77,6 +79,7 @@ pub struct Player {
 pub struct Organization {
     pub id: Uuid,
     pub name: String,
+    pub organization_type: OrganizationType,
     pub vp: Option<Uuid>,
     pub company_relation: CompanyRelation,
     pub financials: Financials,
@@ -93,6 +96,40 @@ pub struct Entity {
     pub employment: Option<Employment>,
     pub owner: Option<Owner>,
     pub origin: Origin,
+    pub flags: Vec<EntityFlag>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub enum CompanyType {
+    ECommerce,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Copy, PartialEq, Eq, Hash)]
+pub enum OrganizationType {
+    Warehouse,
+    RetailSite,
+    SupportCenter,
+    MarketingTeam,
+    LogisticsHub,
+    ProductManagement,
+    ITInfrastructure,
+    Finance,
+    HR,
+    Legal,
+    DataAnalytics,
+    RnD,
+    ContentCreation,
+}
+
+pub const CORE_ORGANIZATION_TYPES: &[OrganizationType] = &[
+    OrganizationType::Legal,
+    OrganizationType::HR,
+    OrganizationType::Finance,
+];
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub enum EntityFlag {
+    Hoarder,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -102,12 +139,36 @@ pub enum EmployeeFlag {
     Loyal,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum OrganizationRole {
-    Janitor,
-    Worker,
-    Manager,
+    // Core / Corporate
     VP,
+    CFO,
+    COO,
+    HRManager,
+    LegalCounsel,
+    Accountant,
+
+    // Tech & Product
+    SoftwareEngineer,
+    DataScientist,
+    ProductManager,
+    DevOpsEngineer,
+    UXDesigner,
+
+    // Operations
+    WarehouseManager,
+    LogisticsCoordinator,
+    CustomerSupport,
+
+    // Marketing & Sales
+    MarketingSpecialist,
+    ContentCreator,
+    SalesRep,
+
+    // Research
+    ResearchScientist,
+    RnDEngineer,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -126,12 +187,26 @@ pub enum Initiative {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum EntityType {
-    Human,
+    Human(HumanType),
     Cat(CatBreed),
     Dog(DogBreed),
     Horse(HorseBreed),
     Lizard(LizardBreed),
     Fish(FishBreed),
+}
+
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum HumanType {
+    Analytical,
+    Creative,
+    Leader,
+    DetailOriented,
+    PeoplePerson,
+    TechSavvy,
+    RiskTaker,
+    Supportive,
+    FastLearner,
+    Organizer,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

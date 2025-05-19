@@ -2,7 +2,7 @@ use crate::views::get_age_description;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Wrap};
-use ratatui::{widgets::Paragraph, Frame};
+use ratatui::{Frame, widgets::Paragraph};
 use renderer_api::ClientGameState;
 use shared::Organization;
 use uuid::Uuid;

@@ -9,7 +9,7 @@ pub fn process_broadcast_world_state(
     server_game_state: Res<ServerGameState>,
     server_event_sender: Res<ServerEventSender>,
 ) {
-    if needs_broadcast.0 == true {
+    if needs_broadcast.0 {
         needs_broadcast.0 = false;
     } else {
         return;
@@ -17,7 +17,7 @@ pub fn process_broadcast_world_state(
 
     // Only send if there's a connected player and we're due to broadcast
     if let Some(player) = server_game_state.game_state.players.first() {
-        if player.id == None {
+        if player.id.is_none() {
             return;
         }
     } else {
