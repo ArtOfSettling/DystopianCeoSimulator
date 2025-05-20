@@ -143,6 +143,12 @@ pub fn process_server_events(
             game_state_snapshot.ordered_pets_of_entity = ordered_pets_of_entity;
             game_state_snapshot.ordered_children_of_entity = ordered_children_of_entity;
         }
-        ServerEvent::HistoryState(rx_history) => history_state_snapshot.history_state = rx_history,
+        ServerEvent::HistoryState(rx_history) => {
+            history_state_snapshot.history_state = rx_history.clone();
+            history_state_snapshot.player_order = rx_history.players.keys().cloned().collect();
+            history_state_snapshot.organization_order =
+                rx_history.organizations.keys().cloned().collect();
+            history_state_snapshot.company_order = rx_history.companies.keys().cloned().collect();
+        }
     }
 }

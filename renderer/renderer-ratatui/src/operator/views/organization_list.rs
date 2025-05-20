@@ -1,14 +1,14 @@
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
-use ratatui::widgets::{Block, Borders, Sparkline, Wrap};
+use ratatui::widgets::{Block, Borders, Wrap};
 use ratatui::{Frame, widgets::Paragraph};
 use renderer_api::{ClientGameState, ClientHistoryState};
-use shared::{HistoryPoint, Initiative, OrganizationHistory};
+use shared::Initiative;
 use uuid::Uuid;
 
 pub fn render_organization_list(
     client_game_state: &ClientGameState,
-    client_history_state: &ClientHistoryState,
+    _client_history_state: &ClientHistoryState,
     frame: &mut Frame,
     main_area: &Rect,
     company_id: &Uuid,
@@ -21,14 +21,6 @@ pub fn render_organization_list(
 
     let left_pane = chunks[0];
     let right_pane = chunks[1];
-
-    let detail_area = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Min(1), Constraint::Length(12)])
-        .split(right_pane);
-
-    let top_pane = detail_area[0];
-    let bottom_pane = detail_area[1];
 
     if let Some(organization_ids) = client_game_state
         .ordered_organizations_of_company
@@ -43,15 +35,7 @@ pub fn render_organization_list(
         );
 
         let organization_id = organization_ids[*selected_index];
-        render_organization_summary(frame, &top_pane, client_game_state, &organization_id);
-        let history = client_history_state
-            .history_state
-            .organizations
-            .iter()
-            .find(|(id, _organization)| **id == organization_id);
-        if let Some((_organization_id, organization_history)) = history {
-            render_history_graphs(frame, &bottom_pane, organization_history);
-        }
+        render_organization_summary(frame, &right_pane, client_game_state, &organization_id);
     }
 }
 
@@ -176,70 +160,4 @@ pub fn render_organization_summary(
         .wrap(Wrap { trim: true });
 
     frame.render_widget(paragraph, *rect);
-}
-
-fn render_history_graphs(
-    frame: &mut Frame,
-    area: &Rect,
-    organization_history: &OrganizationHistory,
-) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(vec![
-            Constraint::Length(2),
-            Constraint::Length(2),
-            Constraint::Length(2),
-            Constraint::Length(2),
-            Constraint::Length(2),
-        ])
-        .split(*area);
-
-    let history = |f: fn(&HistoryPoint) -> i32| -> Vec<u64> {
-        organization_history
-            .recent_history
-            .iter()
-            .map(f)
-            .map(|v| v.max(0) as u64)
-            .collect()
-    };
-
-    frame.render_widget(
-        Sparkline::default()
-            .block(Block::default().title("Net Profit"))
-            .data(history(|h| h.financials.this_weeks_net_profit))
-            .style(Style::default().fg(Color::Green)),
-        chunks[0],
-    );
-
-    frame.render_widget(
-        Sparkline::default()
-            .block(Block::default().title("Cash"))
-            .data(history(|h| h.financials.actual_cash))
-            .style(Style::default().fg(Color::Yellow)),
-        chunks[1],
-    );
-
-    frame.render_widget(
-        Sparkline::default()
-            .block(Block::default().title("Public Opinion"))
-            .data(history(|h| h.perception.public_opinion as i32))
-            .style(Style::default().fg(Color::Cyan)),
-        chunks[2],
-    );
-
-    frame.render_widget(
-        Sparkline::default()
-            .block(Block::default().title("Reputation"))
-            .data(history(|h| h.perception.reputation as i32))
-            .style(Style::default().fg(Color::Magenta)),
-        chunks[3],
-    );
-
-    frame.render_widget(
-        Sparkline::default()
-            .block(Block::default().title("Satisfaction"))
-            .data(history(|h| h.avg_employee_satisfaction as i32))
-            .style(Style::default().fg(Color::Blue)),
-        chunks[4],
-    );
 }

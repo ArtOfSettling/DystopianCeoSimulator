@@ -1,10 +1,7 @@
-mod input;
-mod navigation;
-mod routes;
-mod views;
-
+mod dashboard_viewer;
+mod operator;
 mod plugin;
-mod renderer;
 mod system;
 
+pub use operator::*;
 pub use plugin::RatatuiRendererPlugin;

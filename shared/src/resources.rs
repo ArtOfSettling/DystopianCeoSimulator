@@ -1,6 +1,11 @@
-use crate::{GameState, HistoryState};
+use crate::{GameState, HistoryState, OperatorMode};
 use bevy::prelude::Resource;
 use uuid::Uuid;
+
+#[derive(Resource)]
+pub struct OperatorModeResource {
+    pub operator_mode: OperatorMode,
+}
 
 #[derive(Resource)]
 pub struct ServerGameState {

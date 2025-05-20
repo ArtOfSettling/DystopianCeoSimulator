@@ -7,13 +7,14 @@ mod systems;
 use crate::systems::{
     process_broadcast_world_state, process_client_commands, process_command_log, process_event_log,
     process_fan_out_commands, process_fan_out_events, process_internal_commands,
-    process_internal_events, setup_command_log, setup_connection_resources, setup_event_log,
-    setup_fan_out_commands, setup_fan_out_events, setup_redrive_command_log,
-    setup_redrive_event_log, setup_world_state,
+    process_internal_events, process_print_active_connections, setup_command_log,
+    setup_connection_resources, setup_event_log, setup_fan_out_commands, setup_fan_out_events,
+    setup_redrive_command_log, setup_redrive_event_log, setup_world_state,
 };
 use bevy::MinimalPlugins;
 use bevy::app::{App, FixedUpdate, PluginGroup, ScheduleRunnerPlugin, Startup};
 use bevy::prelude::IntoSystemConfigs;
+use bevy::time::common_conditions::on_timer;
 use bevy::time::{Fixed, Time};
 use cli::Cli;
 use std::time::Duration;
@@ -56,6 +57,10 @@ fn main() -> anyhow::Result<()> {
         .insert_resource(InternalEventSender { tx_internal_events })
         .insert_resource(InternalEventReceiver { rx_internal_events })
         .add_systems(Startup, build_setup_chain(&cli))
+        .add_systems(
+            Update,
+            process_print_active_connections.run_if(on_timer(Duration::from_secs_f32(1.0))),
+        )
         .add_systems(
             FixedUpdate,
             (

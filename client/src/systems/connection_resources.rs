@@ -1,12 +1,12 @@
 use async_channel::{Receiver, Sender, bounded};
 use async_std::io::ReadExt;
 use async_std::net::TcpStream;
-use bevy::prelude::{Commands, Resource};
+use bevy::prelude::{Commands, Res, Resource};
 use bevy::tasks::IoTaskPool;
 use bevy::tasks::futures_lite::AsyncWriteExt;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use futures::FutureExt;
-use shared::{ClientCommand, ServerEvent};
+use shared::{ClientMessage, OperatorModeResource, ServerEvent};
 use tracing::{error, info, instrument};
 
 #[derive(Resource)]
@@ -16,18 +16,33 @@ pub struct ServerEventsReceiver {
 
 #[derive(Resource)]
 pub struct ClientCommandSender {
-    pub(crate) tx_client_commands: Sender<ClientCommand>,
+    pub(crate) tx_client_commands: Sender<ClientMessage>,
 }
 
-pub fn setup_connection_resources(mut commands: Commands) {
+pub fn setup_connection_resources(
+    operator_mode_resource: Res<OperatorModeResource>,
+    mut commands: Commands,
+) {
     let (tx_client_commands, rx_client_commands) = bounded(32);
     let (tx_server_events, rx_server_events) = bounded(32);
+    let operator_mode = operator_mode_resource.operator_mode.clone();
 
     IoTaskPool::get()
         .spawn(async move {
             info!("Connecting to server");
-            let stream = TcpStream::connect("127.0.0.1:12345").await.unwrap();
-            info!("Server listening on 127.0.0.1:12345");
+            let mut stream = TcpStream::connect("127.0.0.1:12345").await.unwrap();
+
+            let serialized = bincode::serialize(&ClientMessage::Hello {
+                mode: operator_mode,
+            })
+            .unwrap();
+            let mut msg = Vec::new();
+            msg.write_u32::<BigEndian>(serialized.len() as u32).unwrap();
+            msg.extend_from_slice(&serialized);
+            stream.write_all(&msg).await.unwrap();
+
+            info!("Connected and sent hello");
+
             handle_server(stream, tx_server_events, rx_client_commands).await
         })
         .detach();
@@ -40,7 +55,7 @@ pub fn setup_connection_resources(mut commands: Commands) {
 async fn handle_server(
     mut stream: TcpStream,
     tx_server_commands: Sender<ServerEvent>,
-    rx_client_commands: Receiver<ClientCommand>,
+    rx_client_commands: Receiver<ClientMessage>,
 ) {
     let mut length_buf = [0; 4];
 

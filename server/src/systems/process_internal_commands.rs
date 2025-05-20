@@ -22,13 +22,19 @@ pub fn process_internal_commands(
             );
 
             match internal_command {
-                InternalCommand::PlayerConnected { player_id } => {
-                    info!("attaching tracked_entity {:?}", player_id);
-                    player.id = Some(player_id);
+                InternalCommand::OperatorConnected { id } => {
+                    info!("attaching Operator with uuid {:?}", id);
+                    player.id = Some(id);
                 }
-                InternalCommand::PlayerDisconnected { player_id } => {
-                    info!("de-spawning player with uuid {:?}", player_id);
+                InternalCommand::OperatorDisconnected { id } => {
+                    info!("de-spawning Operator with uuid {:?}", id);
                     player.id = None;
+                }
+                InternalCommand::DashboardViewerConnected { id } => {
+                    info!("de-spawning Dashboard Viewer with uuid {:?}", id);
+                }
+                InternalCommand::DashboardViewerDisconnected { id } => {
+                    info!("de-spawning Dashboard Viewer with uuid {:?}", id);
                 }
             }
 

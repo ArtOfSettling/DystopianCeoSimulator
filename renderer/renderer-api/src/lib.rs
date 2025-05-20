@@ -13,6 +13,7 @@ pub struct ClientGameState {
     pub organizations: HashMap<Uuid, Organization>,
     pub entities: HashMap<Uuid, Entity>,
 
+    // For Predictable ordering
     pub ordered_organizations_of_company: HashMap<Uuid, Vec<Uuid>>,
     pub ordered_employees_of_organization: HashMap<Uuid, Vec<Uuid>>,
     pub ordered_employees_of_company: HashMap<Uuid, Vec<Uuid>>,
@@ -24,6 +25,11 @@ pub struct ClientGameState {
 #[derive(Resource)]
 pub struct ClientHistoryState {
     pub history_state: HistoryState,
+
+    // For Predictable ordering
+    pub player_order: Vec<Uuid>,
+    pub organization_order: Vec<Uuid>,
+    pub company_order: Vec<Uuid>,
 }
 
 #[derive(Resource)]

@@ -7,17 +7,25 @@ use crate::systems::{
 use bevy::MinimalPlugins;
 use bevy::app::{App, FixedUpdate, PluginGroup, ScheduleRunnerPlugin, Startup};
 use bevy::prelude::{Fixed, IntoSystemConfigs, Time};
+use clap::Parser;
 use input_crossterm::CrossTermInputPlugins;
 use renderer_ratatui::RatatuiRendererPlugin;
+use shared::{ClientArgs, OperatorMode, OperatorModeResource};
 use std::time::Duration;
 use tracing::info;
 use tracing_appender::non_blocking::WorkerGuard;
 
 fn main() -> anyhow::Result<()> {
+    let args = ClientArgs::parse();
+    let operator_mode: OperatorMode = args.operator_mode.into();
+
     let _guard = setup_logging();
     info!("Logging configured");
 
     App::new()
+        .insert_resource(OperatorModeResource {
+            operator_mode: operator_mode.clone(),
+        })
         .add_plugins(MinimalPlugins.set(ScheduleRunnerPlugin::run_loop(Duration::from_millis(10))))
         .insert_resource(Time::<Fixed>::from_hz(128.0))
         .add_systems(
@@ -31,7 +39,9 @@ fn main() -> anyhow::Result<()> {
         )
         .add_systems(FixedUpdate, process_server_events)
         .add_systems(FixedUpdate, send_client_commands)
-        .add_plugins(RatatuiRendererPlugin {})
+        .add_plugins(RatatuiRendererPlugin {
+            operator_mode: operator_mode.clone(),
+        })
         .add_plugins(CrossTermInputPlugins {})
         .run();
 
