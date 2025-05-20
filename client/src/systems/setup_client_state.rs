@@ -22,5 +22,8 @@ pub fn setup_world_state(mut commands: Commands) {
             organizations: Default::default(),
             companies: Default::default(),
         },
+        player_order: vec![],
+        organization_order: vec![],
+        company_order: vec![],
     });
 }

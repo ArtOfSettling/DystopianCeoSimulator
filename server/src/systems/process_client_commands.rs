@@ -2,9 +2,7 @@ use crate::systems::FanOutClientCommandReceiver;
 use crate::{InternalEventSender, NeedsStateUpdate};
 use bevy::prelude::{Res, ResMut};
 use bevy::utils::HashMap;
-use shared::{
-    ClientCommand, HistoryPoint, InternalEvent, OrganizationRole, PlayerAction, ServerGameState,
-};
+use shared::{ClientActionCommand, HistoryPoint, InternalEvent, OrganizationRole, ServerGameState};
 use tracing::info;
 use uuid::Uuid;
 
@@ -14,151 +12,149 @@ pub fn process_client_commands(
     internal_event_sender: Res<InternalEventSender>,
     server_game_state: Res<ServerGameState>,
 ) {
-    while let Ok((_, client_command)) = channel.rx_fan_out_client_commands.try_recv() {
+    while let Ok((_, client_action_command)) = channel.rx_fan_out_client_action_commands.try_recv()
+    {
         needs_state_update.0 = true;
         info!(
             "Server has clients command for processing {:?}",
-            client_command
+            client_action_command
         );
-        match client_command {
-            ClientCommand::PlayerAction(player_action) => match player_action {
-                PlayerAction::FireEmployee { employee_id } => {
-                    if let Some(employee) = server_game_state.game_state.entities.get(&employee_id)
-                    {
-                        info!("Firing employee: {}", employee.name);
+        match client_action_command {
+            ClientActionCommand::FireEmployee { employee_id } => {
+                if let Some(employee) = server_game_state.game_state.entities.get(&employee_id) {
+                    info!("Firing employee: {}", employee.name);
 
-                        let _ = internal_event_sender
-                            .tx_internal_events
-                            .try_send(InternalEvent::RemoveEmployedStatus { employee_id });
+                    let _ = internal_event_sender
+                        .tx_internal_events
+                        .try_send(InternalEvent::RemoveEmployedStatus { employee_id });
 
-                        for (org_id, org) in &server_game_state.game_state.organizations {
-                            if org.vp == Some(employee_id) {
-                                let _ = internal_event_sender.tx_internal_events.try_send(
-                                    InternalEvent::SetOrgVp {
-                                        organization_id: *org_id,
-                                        employee_id: None,
-                                    },
-                                );
-                            }
+                    for (org_id, org) in &server_game_state.game_state.organizations {
+                        if org.vp == Some(employee_id) {
+                            let _ = internal_event_sender.tx_internal_events.try_send(
+                                InternalEvent::SetOrgVp {
+                                    organization_id: *org_id,
+                                    employee_id: None,
+                                },
+                            );
                         }
                     }
                 }
+            }
 
-                PlayerAction::HireEmployee {
-                    organization_id,
-                    employee_id,
-                } => {
-                    if let Some((employee_id, employee)) = server_game_state
-                        .game_state
-                        .entities
-                        .iter()
-                        .find(|(entity_id, _)| **entity_id == employee_id)
-                    {
-                        info!("Hiring employee: {}", employee.name);
-                        internal_event_sender
-                            .tx_internal_events
-                            .try_send(InternalEvent::AddEmployedStatus {
-                                organization_id,
-                                employee_id: *employee_id,
-                            })
-                            .unwrap();
-                    }
-                }
-
-                PlayerAction::GiveRaise {
-                    employee_id,
-                    amount,
-                } => {
-                    if let Some((employee_id, employee)) = server_game_state
-                        .game_state
-                        .entities
-                        .iter()
-                        .find(|(entity_id, _)| **entity_id == employee_id)
-                    {
-                        info!("Growing employee: {}", employee.name);
-
-                        internal_event_sender
-                            .tx_internal_events
-                            .try_send(InternalEvent::IncrementEmployeeSatisfaction {
-                                employee_id: *employee_id,
-                                amount: 1,
-                            })
-                            .unwrap();
-
-                        internal_event_sender
-                            .tx_internal_events
-                            .try_send(InternalEvent::IncrementSalary {
-                                employee_id: *employee_id,
-                                amount,
-                            })
-                            .unwrap();
-                    }
-                }
-
-                PlayerAction::LaunchPRCampaign => {
+            ClientActionCommand::HireEmployee {
+                organization_id,
+                employee_id,
+            } => {
+                if let Some((employee_id, employee)) = server_game_state
+                    .game_state
+                    .entities
+                    .iter()
+                    .find(|(entity_id, _)| **entity_id == employee_id)
+                {
+                    info!("Hiring employee: {}", employee.name);
                     internal_event_sender
                         .tx_internal_events
-                        .try_send(InternalEvent::IncrementReputation { amount: 1 })
+                        .try_send(InternalEvent::AddEmployedStatus {
+                            organization_id,
+                            employee_id: *employee_id,
+                        })
+                        .unwrap();
+                }
+            }
+
+            ClientActionCommand::GiveRaise {
+                employee_id,
+                amount,
+            } => {
+                if let Some((employee_id, employee)) = server_game_state
+                    .game_state
+                    .entities
+                    .iter()
+                    .find(|(entity_id, _)| **entity_id == employee_id)
+                {
+                    info!("Growing employee: {}", employee.name);
+
+                    internal_event_sender
+                        .tx_internal_events
+                        .try_send(InternalEvent::IncrementEmployeeSatisfaction {
+                            employee_id: *employee_id,
+                            amount: 1,
+                        })
                         .unwrap();
 
                     internal_event_sender
                         .tx_internal_events
-                        .try_send(InternalEvent::DecrementMoney { amount: 1_000 })
+                        .try_send(InternalEvent::IncrementSalary {
+                            employee_id: *employee_id,
+                            amount,
+                        })
                         .unwrap();
                 }
+            }
 
-                PlayerAction::DoNothing => {
-                    info!("Player did nothing this turn.");
-                }
+            ClientActionCommand::LaunchPRCampaign => {
+                internal_event_sender
+                    .tx_internal_events
+                    .try_send(InternalEvent::IncrementReputation { amount: 1 })
+                    .unwrap();
 
-                PlayerAction::PromoteToVp {
-                    organization_id,
-                    employee_id,
-                } => {
+                internal_event_sender
+                    .tx_internal_events
+                    .try_send(InternalEvent::DecrementMoney { amount: 1_000 })
+                    .unwrap();
+            }
+
+            ClientActionCommand::DoNothing => {
+                info!("Player did nothing this turn.");
+            }
+
+            ClientActionCommand::PromoteToVp {
+                organization_id,
+                employee_id,
+            } => {
+                internal_event_sender
+                    .tx_internal_events
+                    .try_send(InternalEvent::SetOrganizationRole {
+                        employee_id,
+                        new_role: OrganizationRole::VP,
+                    })
+                    .unwrap();
+
+                let existing_vp_id = server_game_state
+                    .game_state
+                    .organizations
+                    .get(&organization_id)
+                    .and_then(|org| org.vp);
+
+                if let Some(employee_id) = existing_vp_id {
                     internal_event_sender
                         .tx_internal_events
                         .try_send(InternalEvent::SetOrganizationRole {
                             employee_id,
-                            new_role: OrganizationRole::VP,
-                        })
-                        .unwrap();
-
-                    let existing_vp_id = server_game_state
-                        .game_state
-                        .organizations
-                        .get(&organization_id)
-                        .and_then(|org| org.vp);
-
-                    if let Some(employee_id) = existing_vp_id {
-                        internal_event_sender
-                            .tx_internal_events
-                            .try_send(InternalEvent::SetOrganizationRole {
-                                employee_id,
-                                new_role: OrganizationRole::HRManager,
-                            })
-                            .unwrap();
-                    }
-
-                    internal_event_sender
-                        .tx_internal_events
-                        .try_send(InternalEvent::SetOrgVp {
-                            organization_id,
-                            employee_id: Some(employee_id),
+                            new_role: OrganizationRole::HRManager,
                         })
                         .unwrap();
                 }
 
-                PlayerAction::UpdateBudget {
-                    organization_id,
-                    organization_budget,
-                } => internal_event_sender
+                internal_event_sender
                     .tx_internal_events
-                    .try_send(InternalEvent::SetOrgBudget {
+                    .try_send(InternalEvent::SetOrgVp {
                         organization_id,
-                        budget: organization_budget,
+                        employee_id: Some(employee_id),
                     })
-                    .unwrap(),
-            },
+                    .unwrap();
+            }
+
+            ClientActionCommand::UpdateBudget {
+                organization_id,
+                organization_budget,
+            } => internal_event_sender
+                .tx_internal_events
+                .try_send(InternalEvent::SetOrgBudget {
+                    organization_id,
+                    budget: organization_budget,
+                })
+                .unwrap(),
         }
 
         let total_productivity: i32 = server_game_state

@@ -2,7 +2,7 @@ use crate::systems::FanOutLogCommandReceiver;
 use crate::systems::setup_command_log::CommandLog;
 use bevy::prelude::ResMut;
 use serde::{Deserialize, Serialize};
-use shared::ClientCommand;
+use shared::ClientActionCommand;
 use std::io::Write;
 use uuid::Uuid;
 
@@ -10,7 +10,7 @@ use uuid::Uuid;
 pub struct LoggedCommand {
     pub timestamp_epoch_millis: u64,
     pub client_id: Uuid,
-    pub command: ClientCommand,
+    pub command: ClientActionCommand,
 }
 
 pub fn process_command_log(

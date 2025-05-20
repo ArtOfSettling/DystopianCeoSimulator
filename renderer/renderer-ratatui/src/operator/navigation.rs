@@ -1,4 +1,4 @@
-use crate::routes::{OrganizationList, Route};
+use crate::operator::routes::{OrganizationList, Route};
 
 pub enum NavigationAction {
     Push(Route),

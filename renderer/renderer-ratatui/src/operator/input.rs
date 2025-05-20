@@ -1,9 +1,9 @@
-use crate::navigation::{NavigationAction, NavigationStack};
-use crate::routes::{OrganizationList, OrganizationTab, OrganizationView, Route};
+use crate::operator::navigation::{NavigationAction, NavigationStack};
+use crate::operator::routes::{OrganizationList, OrganizationTab, OrganizationView, Route};
 use bevy::prelude::ResMut;
 use input_api::PlayerInputAction;
 use renderer_api::ClientGameState;
-use shared::{Budget, PendingPlayerAction, PlayerAction};
+use shared::{Budget, ClientActionCommand, PendingPlayerAction};
 
 fn try_switch_tab(current: &Route) -> Option<Route> {
     match current {
@@ -116,7 +116,7 @@ pub trait InputHandler {
         &mut self,
         action: PlayerInputAction,
         client_game_state: &ClientGameState,
-    ) -> Option<PlayerAction>;
+    ) -> Option<ClientActionCommand>;
 }
 
 impl InputHandler for OrganizationList {
@@ -124,10 +124,10 @@ impl InputHandler for OrganizationList {
         &mut self,
         action: PlayerInputAction,
         client_game_state: &ClientGameState,
-    ) -> Option<PlayerAction> {
+    ) -> Option<ClientActionCommand> {
         let (company_id, _company) = client_game_state.companies.iter().next().unwrap();
         match action {
-            PlayerInputAction::DoNothing => Some(PlayerAction::DoNothing),
+            PlayerInputAction::DoNothing => Some(ClientActionCommand::DoNothing),
             PlayerInputAction::MenuUp => {
                 self.selected_index = self.selected_index.saturating_sub(1);
                 None
@@ -142,7 +142,7 @@ impl InputHandler for OrganizationList {
                 );
                 None
             }
-            PlayerInputAction::LaunchPRCampaign => Some(PlayerAction::LaunchPRCampaign),
+            PlayerInputAction::LaunchPRCampaign => Some(ClientActionCommand::LaunchPRCampaign),
             _ => None,
         }
     }
@@ -153,7 +153,7 @@ impl InputHandler for OrganizationView {
         &mut self,
         action: PlayerInputAction,
         client_game_state: &ClientGameState,
-    ) -> Option<PlayerAction> {
+    ) -> Option<ClientActionCommand> {
         match self.tab {
             OrganizationTab::Detail => match action {
                 PlayerInputAction::MenuDown => {
@@ -175,7 +175,7 @@ impl InputHandler for OrganizationView {
                         .get(&self.organization_id)?
                         .get(self.selected_index)
                     {
-                        Some(PlayerAction::PromoteToVp {
+                        Some(ClientActionCommand::PromoteToVp {
                             organization_id: self.organization_id,
                             employee_id: *employee_id,
                         })
@@ -188,7 +188,7 @@ impl InputHandler for OrganizationView {
                     .ordered_employees_of_organization
                     .get(&self.organization_id)?
                     .get(self.selected_index)
-                    .map(|employee_id| PlayerAction::GiveRaise {
+                    .map(|employee_id| ClientActionCommand::GiveRaise {
                         employee_id: *employee_id,
                         amount: 1_000,
                     }),
@@ -197,7 +197,7 @@ impl InputHandler for OrganizationView {
                     .ordered_employees_of_organization
                     .get(&self.organization_id)?
                     .get(self.selected_index)
-                    .map(|employee_id| PlayerAction::FireEmployee {
+                    .map(|employee_id| ClientActionCommand::FireEmployee {
                         employee_id: *employee_id,
                     }),
 
@@ -231,7 +231,7 @@ impl InputHandler for OrganizationView {
                     }
                     None
                 }
-                PlayerInputAction::MenuCommit => Some(PlayerAction::UpdateBudget {
+                PlayerInputAction::MenuCommit => Some(ClientActionCommand::UpdateBudget {
                     organization_id: self.organization_id,
                     organization_budget: Budget {
                         marketing: self.marketing,
@@ -258,7 +258,7 @@ impl InputHandler for OrganizationView {
                         .ordered_unemployed_entities
                         .get(self.selected_index)
                     {
-                        Some(PlayerAction::HireEmployee {
+                        Some(ClientActionCommand::HireEmployee {
                             employee_id: *employee_id,
                             organization_id: self.organization_id,
                         })

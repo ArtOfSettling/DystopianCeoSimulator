@@ -1,6 +1,6 @@
 use crate::systems::ClientCommandSender;
 use bevy::prelude::{Res, ResMut};
-use shared::{ClientCommand, PendingPlayerAction};
+use shared::{ClientMessage, PendingPlayerAction};
 use tracing::info;
 
 pub fn send_client_commands(
@@ -19,7 +19,7 @@ pub fn send_client_commands(
 
     let _ = &channel
         .tx_client_commands
-        .try_send(ClientCommand::PlayerAction(player_action));
+        .try_send(ClientMessage::ClientActionCommand(player_action));
 
     pending_player_action.0 = None;
 }

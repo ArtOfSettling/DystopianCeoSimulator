@@ -62,6 +62,7 @@ async fn main() -> anyhow::Result<()> {
 
 async fn wait_for_server_ready(port: u16, max_retries: u32) -> bool {
     for _ in 0..max_retries {
+        sleep(Duration::from_millis(200)).await;
         if timeout(
             Duration::from_secs(1),
             TcpStream::connect(("127.0.0.1", port)),
@@ -71,7 +72,6 @@ async fn wait_for_server_ready(port: u16, max_retries: u32) -> bool {
         {
             return true;
         }
-        sleep(Duration::from_millis(200)).await;
     }
     false
 }

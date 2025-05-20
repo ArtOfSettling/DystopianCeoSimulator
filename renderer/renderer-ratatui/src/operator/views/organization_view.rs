@@ -1,7 +1,7 @@
-use crate::routes::{OrganizationTab, OrganizationView};
-use crate::views::organization_budget::render_organization_budget;
-use crate::views::organization_details::render_organization_details;
-use crate::views::render_hiring;
+use crate::operator::routes::{OrganizationTab, OrganizationView};
+use crate::operator::views::organization_budget::render_organization_budget;
+use crate::operator::views::organization_details::render_organization_details;
+use crate::operator::views::render_hiring;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};

@@ -1,18 +1,28 @@
+mod client_args;
 pub mod game_data;
 pub mod history_data;
 pub mod resources;
 
 use bevy::prelude::Resource;
 use bevy::utils::HashMap;
+pub use client_args::*;
 pub use game_data::*;
 pub use history_data::*;
 pub use resources::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub enum OperatorMode {
+    #[default]
+    Operator,
+    DashboardViewer,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum ClientCommand {
-    PlayerAction(PlayerAction),
+pub enum ClientMessage {
+    Hello { mode: OperatorMode },
+    ClientActionCommand(ClientActionCommand),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -97,7 +107,7 @@ pub enum ServerEvent {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum PlayerAction {
+pub enum ClientActionCommand {
     FireEmployee {
         employee_id: Uuid,
     },
@@ -122,4 +132,4 @@ pub enum PlayerAction {
 }
 
 #[derive(Resource, Default, Debug)]
-pub struct PendingPlayerAction(pub Option<PlayerAction>);
+pub struct PendingPlayerAction(pub Option<ClientActionCommand>);

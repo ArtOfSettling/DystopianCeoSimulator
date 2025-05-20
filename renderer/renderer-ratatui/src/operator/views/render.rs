@@ -1,5 +1,5 @@
-use crate::routes::{OrganizationTab, Route};
-use crate::views::{render_organization_list, render_organization_view};
+use crate::operator::routes::{OrganizationTab, Route};
+use crate::operator::views::{render_organization_list, render_organization_view};
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::prelude::{Color, Style};
