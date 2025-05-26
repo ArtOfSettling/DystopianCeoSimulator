@@ -1,6 +1,24 @@
 use crate::{GameState, HistoryState, OperatorMode};
 use bevy::prelude::Resource;
+use std::time::Instant;
 use uuid::Uuid;
+
+#[derive(Resource)]
+pub struct ConnectionStateResource {
+    pub connection_state: ConnectionState,
+}
+
+#[derive(Debug, Clone)]
+pub enum ConnectionState {
+    Connecting,
+    Connected,
+    Disconnected,
+    Error(String),
+    Reconnecting {
+        next_attempt_in: u64,
+        last_update: Instant,
+    },
+}
 
 #[derive(Resource)]
 pub struct OperatorModeResource {

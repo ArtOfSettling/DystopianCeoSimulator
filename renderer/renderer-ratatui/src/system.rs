@@ -2,7 +2,7 @@ use bevy::app::AppExit;
 use bevy::prelude::{EventWriter, Res, ResMut};
 use input_api::PendingPlayerInputAction;
 use renderer_api::{ClientGameState, ClientHistoryState, RendererResource};
-use shared::PendingPlayerAction;
+use shared::{ConnectionStateResource, PendingPlayerAction};
 
 pub fn render_system(
     mut render_resource: ResMut<RendererResource>,
@@ -10,6 +10,7 @@ pub fn render_system(
     history_state: Res<ClientHistoryState>,
     pending_player_input_action: ResMut<PendingPlayerInputAction>,
     pending_player_action: ResMut<PendingPlayerAction>,
+    connection_state_resource: Res<ConnectionStateResource>,
     exit_writer: EventWriter<AppExit>,
 ) {
     render_resource.renderer.render(
@@ -17,6 +18,7 @@ pub fn render_system(
         &history_state,
         pending_player_input_action,
         pending_player_action,
+        connection_state_resource,
         exit_writer,
     );
 }
