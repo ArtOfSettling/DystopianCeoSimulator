@@ -40,11 +40,14 @@ pub fn setup_connection_resources(
 
     IoTaskPool::get()
         .spawn(async move {
+            let mut attempts = 0u64;
             loop {
+                attempts += 1;
                 tx_conn_state.send(ConnectionState::Connecting).await.ok();
 
                 match TcpStream::connect("127.0.0.1:12345").await {
                     Ok(mut stream) => {
+                        attempts = 1;
                         info!("Connected to server");
                         tx_conn_state.send(ConnectionState::Connected).await.ok();
 
@@ -77,7 +80,17 @@ pub fn setup_connection_resources(
                     }
                 }
 
-                sleep(Duration::from_secs(3)).await;
+                let delay_secs = calculate_backoff(attempts, 30);
+                for remaining in (1..=delay_secs).rev() {
+                    tx_conn_state
+                        .send(ConnectionState::Reconnecting {
+                            attempts,
+                            next_attempt_in: remaining,
+                        })
+                        .await
+                        .ok();
+                    sleep(Duration::from_secs(1)).await;
+                }
             }
         })
         .detach();
@@ -90,6 +103,11 @@ pub fn setup_connection_resources(
     commands.insert_resource(ConnectionStateReceiver {
         rx_connection_state,
     });
+}
+
+fn calculate_backoff(attempt: u64, max_delay_secs: u64) -> u64 {
+    let delay = 2u64.pow(attempt.min(6) as u32);
+    delay.min(max_delay_secs)
 }
 
 #[instrument(skip(stream, tx_server_commands, rx_client_commands))]

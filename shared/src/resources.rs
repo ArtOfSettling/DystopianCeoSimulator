@@ -1,6 +1,5 @@
 use crate::{GameState, HistoryState, OperatorMode};
 use bevy::prelude::Resource;
-use std::time::Instant;
 use uuid::Uuid;
 
 #[derive(Resource)]
@@ -14,10 +13,7 @@ pub enum ConnectionState {
     Connected,
     Disconnected,
     Error(String),
-    Reconnecting {
-        next_attempt_in: u64,
-        last_update: Instant,
-    },
+    Reconnecting { attempts: u64, next_attempt_in: u64 },
 }
 
 #[derive(Resource)]

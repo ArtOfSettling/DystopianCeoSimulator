@@ -53,11 +53,12 @@ impl RatatuiOperatorRenderer {
                     frame.render_widget(paragraph, size);
                 }
                 ConnectionState::Reconnecting {
-                    next_attempt_in, ..
+                    attempts,
+                    next_attempt_in,
                 } => {
                     let paragraph = Paragraph::new(Line::from(format!(
-                        "🟡 Reconnecting in {}s...",
-                        next_attempt_in
+                        "🟡 Reconnecting (attempt {}) in {}s...",
+                        attempts, next_attempt_in
                     )))
                     .alignment(Alignment::Center)
                     .block(Block::default().borders(Borders::ALL).title("Status"));
