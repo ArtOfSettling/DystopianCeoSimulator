@@ -84,6 +84,13 @@ impl RatatuiDashboardRenderer {
 
                     render(&mut self.navigation_stack, frame, client_history_state);
                 }
+                ConnectionState::Rejected(reason) => {
+                    let paragraph =
+                        Paragraph::new(Line::from(format!("🔴 Server Rejected: {}", reason)))
+                            .alignment(Alignment::Center)
+                            .block(Block::default().borders(Borders::ALL).title("Status"));
+                    frame.render_widget(paragraph, size);
+                }
             }
         })
     }

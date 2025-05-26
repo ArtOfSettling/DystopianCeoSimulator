@@ -92,6 +92,13 @@ impl RatatuiOperatorRenderer {
                     let current = self.navigation_stack.current();
                     render(current, client_game_state, client_history_state, frame);
                 }
+                ConnectionState::Rejected(reason) => {
+                    let paragraph =
+                        Paragraph::new(Line::from(format!("🔴 Server Rejected: {}", reason)))
+                            .alignment(Alignment::Center)
+                            .block(Block::default().borders(Borders::ALL).title("Status"));
+                    frame.render_widget(paragraph, size);
+                }
             }
         })
     }

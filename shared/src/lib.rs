@@ -102,8 +102,16 @@ pub enum InternalEvent {
 pub enum ServerEvent {
     None,
 
+    Hello(HelloState),
+
     FullState(GameState),
     HistoryState(HistoryState),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum HelloState {
+    Accepted,
+    Rejected { reason: String },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

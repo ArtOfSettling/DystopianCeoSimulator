@@ -13,6 +13,7 @@ pub enum ConnectionState {
     Connected,
     Disconnected,
     Error(String),
+    Rejected(String),
     Reconnecting { attempts: u64, next_attempt_in: u64 },
 }
 

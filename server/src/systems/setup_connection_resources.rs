@@ -9,7 +9,7 @@ use bevy::prelude::{Commands, Resource};
 use bevy::tasks::IoTaskPool;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use futures::{AsyncWriteExt, FutureExt};
-use shared::{ClientActionCommand, ClientMessage, OperatorMode, ServerEvent};
+use shared::{ClientActionCommand, ClientMessage, HelloState, OperatorMode, ServerEvent};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -130,7 +130,24 @@ async fn setup_connection_handler(
                                         "An operator is already connected. Rejecting new operator connection from {}",
                                         addr
                                     );
+
+                                    // Send rejection back to the client.
+                                    let _ = send_bincode_message(
+                                        &mut stream,
+                                        &ServerEvent::Hello(HelloState::Rejected {
+                                            reason: "Operator already connected".to_string(),
+                                        }),
+                                    )
+                                    .await;
+
                                     continue;
+                                } else {
+                                    // Send acceptance back to the client.
+                                    let _ = send_bincode_message(
+                                        &mut stream,
+                                        &ServerEvent::Hello(HelloState::Accepted),
+                                    )
+                                    .await;
                                 }
 
                                 let (tx, rx) = unbounded();
@@ -181,6 +198,13 @@ async fn setup_connection_handler(
                                     .detach();
                             }
                             OperatorMode::DashboardViewer => {
+                                // Send acceptance back to the client.
+                                let _ = send_bincode_message(
+                                    &mut stream,
+                                    &ServerEvent::Hello(HelloState::Accepted),
+                                )
+                                .await;
+
                                 let (tx, rx) = unbounded();
                                 let addr_str = addr.to_string();
                                 let uuid = Uuid::new_v5(&Uuid::NAMESPACE_DNS, addr_str.as_bytes());

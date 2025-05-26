@@ -1,10 +1,10 @@
 use crate::systems::ServerEventsReceiver;
 use bevy::prelude::{Res, ResMut};
 use renderer_api::{ClientGameState, ClientHistoryState};
-use shared::{EntityType, ServerEvent};
+use shared::{EntityType, HelloState, ServerEvent};
 use std::cmp::Reverse;
 use std::collections::HashMap;
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 use uuid::Uuid;
 
 pub fn process_server_events(
@@ -23,6 +23,12 @@ pub fn process_server_events(
 
     match received.unwrap() {
         ServerEvent::None => info!("Client has an empty server event"),
+        ServerEvent::Hello(HelloState::Accepted) => {
+            info!("Client connection accepted");
+        }
+        ServerEvent::Hello(HelloState::Rejected { reason }) => {
+            error!("Client connection rejected: {}", reason)
+        }
         ServerEvent::FullState(rx_game_state) => {
             game_state_snapshot.week = rx_game_state.week;
             game_state_snapshot.players = rx_game_state.players;

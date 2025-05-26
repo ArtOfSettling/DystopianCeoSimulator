@@ -8,7 +8,8 @@ use bevy::tasks::futures_lite::AsyncWriteExt;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use futures::FutureExt;
 use shared::{
-    ClientMessage, ConnectionState, ConnectionStateResource, OperatorModeResource, ServerEvent,
+    ClientMessage, ConnectionState, ConnectionStateResource, HelloState, OperatorModeResource,
+    ServerEvent,
 };
 use std::time::Duration;
 use tracing::{error, info, instrument};
@@ -47,10 +48,6 @@ pub fn setup_connection_resources(
 
                 match TcpStream::connect("127.0.0.1:12345").await {
                     Ok(mut stream) => {
-                        attempts = 1;
-                        info!("Connected to server");
-                        tx_conn_state.send(ConnectionState::Connected).await.ok();
-
                         let serialized = bincode::serialize(&ClientMessage::Hello {
                             mode: operator_mode.clone(),
                         })
@@ -61,8 +58,40 @@ pub fn setup_connection_resources(
                         msg.extend_from_slice(&serialized);
                         stream.write_all(&msg).await.unwrap();
 
+                        match wait_for_handshake(&mut stream).await {
+                            Ok(ServerEvent::Hello(HelloState::Accepted)) => {
+                                info!("Handshake successful");
+                            }
+                            Ok(ServerEvent::Hello(HelloState::Rejected { reason })) => {
+                                error!("Connection rejected by server: {}", reason);
+                                tx_conn_state
+                                    .send(ConnectionState::Rejected(reason))
+                                    .await
+                                    .ok();
+                                return; // exit out and don't retry
+                            }
+                            Ok(other) => {
+                                error!("Unexpected handshake response: {:?}", other);
+                                tx_conn_state
+                                    .send(ConnectionState::Error("Invalid handshake".to_string()))
+                                    .await
+                                    .ok();
+                                continue; // retry logic
+                            }
+                            Err(e) => {
+                                error!("Failed during handshake: {}", e);
+                                tx_conn_state.send(ConnectionState::Error(e)).await.ok();
+                                continue;
+                            }
+                        }
+
+                        attempts = 1;
+                        info!("Connected to server");
+                        tx_conn_state.send(ConnectionState::Connected).await.ok();
+
                         let result = handle_server(
                             stream,
+                            tx_conn_state.clone(),
                             tx_server_events.clone(),
                             rx_client_commands.clone(),
                         )
@@ -110,9 +139,31 @@ fn calculate_backoff(attempt: u64, max_delay_secs: u64) -> u64 {
     delay.min(max_delay_secs)
 }
 
+async fn wait_for_handshake(stream: &mut TcpStream) -> Result<ServerEvent, String> {
+    let mut length_buf = [0; 4];
+
+    stream
+        .read_exact(&mut length_buf)
+        .await
+        .map_err(|e| e.to_string())?;
+    let length = (&length_buf[..]).read_u32::<BigEndian>().unwrap();
+
+    let mut msg_buf = vec![0; length as usize];
+    stream
+        .read_exact(&mut msg_buf)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let server_event: ServerEvent =
+        bincode::deserialize(&msg_buf).map_err(|e| format!("Deserialization error: {}", e))?;
+
+    Ok(server_event)
+}
+
 #[instrument(skip(stream, tx_server_commands, rx_client_commands))]
 async fn handle_server(
     mut stream: TcpStream,
+    tx_conn_state: Sender<ConnectionState>,
     tx_server_commands: Sender<ServerEvent>,
     rx_client_commands: Receiver<ClientMessage>,
 ) {
