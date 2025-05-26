@@ -1,8 +1,8 @@
 mod systems;
 
 use crate::systems::{
-    process_server_events, send_client_commands, setup_connection_resources,
-    setup_pending_player_action, setup_world_state,
+    process_poll_connection_state, process_server_events, send_client_commands,
+    setup_connection_resources, setup_pending_player_action, setup_world_state,
 };
 use bevy::MinimalPlugins;
 use bevy::app::{App, FixedUpdate, PluginGroup, ScheduleRunnerPlugin, Startup};
@@ -39,6 +39,7 @@ fn main() -> anyhow::Result<()> {
         )
         .add_systems(FixedUpdate, process_server_events)
         .add_systems(FixedUpdate, send_client_commands)
+        .add_systems(FixedUpdate, process_poll_connection_state)
         .add_plugins(RatatuiRendererPlugin {
             operator_mode: operator_mode.clone(),
         })

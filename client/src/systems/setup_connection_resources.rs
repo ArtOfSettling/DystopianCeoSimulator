@@ -1,13 +1,22 @@
 use async_channel::{Receiver, Sender, bounded};
 use async_std::io::ReadExt;
 use async_std::net::TcpStream;
+use async_std::task::sleep;
 use bevy::prelude::{Commands, Res, Resource};
 use bevy::tasks::IoTaskPool;
 use bevy::tasks::futures_lite::AsyncWriteExt;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use futures::FutureExt;
-use shared::{ClientMessage, OperatorModeResource, ServerEvent};
+use shared::{
+    ClientMessage, ConnectionState, ConnectionStateResource, OperatorModeResource, ServerEvent,
+};
+use std::time::Duration;
 use tracing::{error, info, instrument};
+
+#[derive(Resource)]
+pub struct ConnectionStateReceiver {
+    pub rx_connection_state: Receiver<ConnectionState>,
+}
 
 #[derive(Resource)]
 pub struct ServerEventsReceiver {
@@ -25,30 +34,62 @@ pub fn setup_connection_resources(
 ) {
     let (tx_client_commands, rx_client_commands) = bounded(32);
     let (tx_server_events, rx_server_events) = bounded(32);
+    let (tx_conn_state, rx_connection_state) = bounded(8);
+
     let operator_mode = operator_mode_resource.operator_mode.clone();
 
     IoTaskPool::get()
         .spawn(async move {
-            info!("Connecting to server");
-            let mut stream = TcpStream::connect("127.0.0.1:12345").await.unwrap();
+            loop {
+                tx_conn_state.send(ConnectionState::Connecting).await.ok();
 
-            let serialized = bincode::serialize(&ClientMessage::Hello {
-                mode: operator_mode,
-            })
-            .unwrap();
-            let mut msg = Vec::new();
-            msg.write_u32::<BigEndian>(serialized.len() as u32).unwrap();
-            msg.extend_from_slice(&serialized);
-            stream.write_all(&msg).await.unwrap();
+                match TcpStream::connect("127.0.0.1:12345").await {
+                    Ok(mut stream) => {
+                        info!("Connected to server");
+                        tx_conn_state.send(ConnectionState::Connected).await.ok();
 
-            info!("Connected and sent hello");
+                        let serialized = bincode::serialize(&ClientMessage::Hello {
+                            mode: operator_mode.clone(),
+                        })
+                        .unwrap();
 
-            handle_server(stream, tx_server_events, rx_client_commands).await
+                        let mut msg = Vec::new();
+                        msg.write_u32::<BigEndian>(serialized.len() as u32).unwrap();
+                        msg.extend_from_slice(&serialized);
+                        stream.write_all(&msg).await.unwrap();
+
+                        let result = handle_server(
+                            stream,
+                            tx_server_events.clone(),
+                            rx_client_commands.clone(),
+                        )
+                        .await;
+
+                        error!("Server connection lost: {:?}", result);
+                        tx_conn_state.send(ConnectionState::Disconnected).await.ok();
+                    }
+                    Err(e) => {
+                        error!("Failed to connect to server: {:?}", e);
+                        tx_conn_state
+                            .send(ConnectionState::Error(e.to_string()))
+                            .await
+                            .ok();
+                    }
+                }
+
+                sleep(Duration::from_secs(3)).await;
+            }
         })
         .detach();
 
     commands.insert_resource(ClientCommandSender { tx_client_commands });
-    commands.insert_resource(ServerEventsReceiver { rx_server_events })
+    commands.insert_resource(ServerEventsReceiver { rx_server_events });
+    commands.insert_resource(ConnectionStateResource {
+        connection_state: ConnectionState::Disconnected,
+    });
+    commands.insert_resource(ConnectionStateReceiver {
+        rx_connection_state,
+    });
 }
 
 #[instrument(skip(stream, tx_server_commands, rx_client_commands))]

@@ -1,7 +1,10 @@
 use bevy::app::AppExit;
-use bevy::prelude::{EventWriter, ResMut, Resource};
+use bevy::prelude::{EventWriter, Res, ResMut, Resource};
 use input_api::PendingPlayerInputAction;
-use shared::{Company, Entity, HistoryState, Organization, PendingPlayerAction, Player};
+use shared::{
+    Company, ConnectionStateResource, Entity, HistoryState, Organization, PendingPlayerAction,
+    Player,
+};
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -50,6 +53,7 @@ pub trait Renderer {
         history_state: &ClientHistoryState,
         pending_player_input_action: ResMut<PendingPlayerInputAction>,
         pending_player_action: ResMut<PendingPlayerAction>,
+        connection_state_resource: Res<ConnectionStateResource>,
         exit_writer: EventWriter<AppExit>,
     );
 }
