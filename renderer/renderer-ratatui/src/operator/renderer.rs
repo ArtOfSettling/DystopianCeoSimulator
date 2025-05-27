@@ -1,8 +1,7 @@
 use crate::operator::input::handle_input;
 use crate::operator::navigation::NavigationStack;
 use crate::operator::views::render::render;
-use bevy::app::AppExit;
-use bevy::prelude::{EventWriter, Res, ResMut};
+use bevy::prelude::{Res, ResMut};
 use input_api::PendingPlayerInputAction;
 use ratatui::backend::CrosstermBackend;
 use ratatui::crossterm::execute;
@@ -40,7 +39,6 @@ impl RatatuiOperatorRenderer {
         client_history_state: &ClientHistoryState,
         pending_player_input_action: &mut ResMut<PendingPlayerInputAction>,
         pending_player_action: &mut ResMut<PendingPlayerAction>,
-        exit_writer: &mut EventWriter<AppExit>,
     ) -> Result<CompletedFrame, io::Error> {
         self.terminal.draw(|frame| {
             let size = frame.area();
@@ -78,15 +76,12 @@ impl RatatuiOperatorRenderer {
                 }
                 ConnectionState::Connected => {
                     if let Some(action) = pending_player_input_action.0.take() {
-                        let continue_execution = handle_input(
+                        handle_input(
                             action,
                             &mut self.navigation_stack,
                             client_game_state,
                             pending_player_action,
                         );
-                        if !continue_execution {
-                            exit_writer.send(AppExit::Success);
-                        }
                     }
 
                     let current = self.navigation_stack.current();
@@ -112,7 +107,6 @@ impl Renderer for RatatuiOperatorRenderer {
         mut pending_player_input_action: ResMut<PendingPlayerInputAction>,
         mut pending_player_action: ResMut<PendingPlayerAction>,
         connection_state_resource: Res<ConnectionStateResource>,
-        mut exit_writer: EventWriter<AppExit>,
     ) {
         if let Err(e) = self.try_draw_frame(
             &connection_state_resource.connection_state,
@@ -120,7 +114,6 @@ impl Renderer for RatatuiOperatorRenderer {
             client_history_state,
             &mut pending_player_input_action,
             &mut pending_player_action,
-            &mut exit_writer,
         ) {
             error!("Render error: {:?}", e);
         } else {

@@ -1,5 +1,4 @@
-use bevy::app::AppExit;
-use bevy::prelude::{EventWriter, Res, ResMut, Resource};
+use bevy::prelude::{Res, ResMut, Resource};
 use input_api::PendingPlayerInputAction;
 use shared::{
     Company, ConnectionStateResource, Entity, HistoryState, Organization, PendingPlayerAction,
@@ -54,6 +53,5 @@ pub trait Renderer {
         pending_player_input_action: ResMut<PendingPlayerInputAction>,
         pending_player_action: ResMut<PendingPlayerAction>,
         connection_state_resource: Res<ConnectionStateResource>,
-        exit_writer: EventWriter<AppExit>,
     );
 }

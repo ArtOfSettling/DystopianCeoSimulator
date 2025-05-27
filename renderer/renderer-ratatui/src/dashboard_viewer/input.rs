@@ -7,18 +7,15 @@ pub fn handle_input(
     player_input_action: PlayerInputAction,
     nav: &mut NavigationStack,
     client_history_state: &ClientHistoryState,
-) -> bool {
-    match player_input_action {
-        PlayerInputAction::Quit => return NavigationAction::Quit.apply(nav),
-        PlayerInputAction::MenuBack => return NavigationAction::Pop.apply(nav),
-        _ => {}
+) {
+    if let PlayerInputAction::MenuBack = player_input_action {
+        NavigationAction::Pop.apply(nav);
+        return;
     }
 
     match nav.current_mut() {
         Route::Dashboard { data } => data.handle_input(player_input_action, client_history_state),
     };
-
-    true
 }
 
 pub trait InputHandler {

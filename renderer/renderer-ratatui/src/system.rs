@@ -1,6 +1,6 @@
 use bevy::app::AppExit;
 use bevy::prelude::{EventWriter, Res, ResMut};
-use input_api::PendingPlayerInputAction;
+use input_api::{PendingPlayerInputAction, PlayerInputAction};
 use renderer_api::{ClientGameState, ClientHistoryState, RendererResource};
 use shared::{ConnectionStateResource, PendingPlayerAction};
 
@@ -11,14 +11,17 @@ pub fn render_system(
     pending_player_input_action: ResMut<PendingPlayerInputAction>,
     pending_player_action: ResMut<PendingPlayerAction>,
     connection_state_resource: Res<ConnectionStateResource>,
-    exit_writer: EventWriter<AppExit>,
+    mut exit_writer: EventWriter<AppExit>,
 ) {
+    if let Some(PlayerInputAction::Quit) = pending_player_input_action.0.clone() {
+        exit_writer.send(AppExit::Success);
+    }
+
     render_resource.renderer.render(
         &game_state,
         &history_state,
         pending_player_input_action,
         pending_player_action,
         connection_state_resource,
-        exit_writer,
     );
 }

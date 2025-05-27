@@ -1,8 +1,7 @@
 use crate::dashboard_viewer::input::handle_input;
 use crate::dashboard_viewer::navigation::NavigationStack;
 use crate::dashboard_viewer::views::render::render;
-use bevy::app::AppExit;
-use bevy::prelude::{EventWriter, Res, ResMut};
+use bevy::prelude::{Res, ResMut};
 use input_api::PendingPlayerInputAction;
 use ratatui::backend::CrosstermBackend;
 use ratatui::crossterm::execute;
@@ -38,7 +37,6 @@ impl RatatuiDashboardRenderer {
         connection_state: &ConnectionState,
         client_history_state: &ClientHistoryState,
         pending_player_input_action: &mut ResMut<PendingPlayerInputAction>,
-        exit_writer: &mut EventWriter<AppExit>,
     ) -> Result<CompletedFrame, io::Error> {
         self.terminal.draw(|frame| {
             let size = frame.area();
@@ -75,11 +73,7 @@ impl RatatuiDashboardRenderer {
                 }
                 ConnectionState::Connected => {
                     if let Some(action) = pending_player_input_action.0.take() {
-                        let continue_execution =
-                            handle_input(action, &mut self.navigation_stack, client_history_state);
-                        if !continue_execution {
-                            exit_writer.send(AppExit::Success);
-                        }
+                        handle_input(action, &mut self.navigation_stack, client_history_state);
                     }
 
                     render(&mut self.navigation_stack, frame, client_history_state);
@@ -104,13 +98,11 @@ impl Renderer for RatatuiDashboardRenderer {
         mut pending_player_input_action: ResMut<PendingPlayerInputAction>,
         mut _pending_player_action: ResMut<PendingPlayerAction>,
         connection_state_resource: Res<ConnectionStateResource>,
-        mut exit_writer: EventWriter<AppExit>,
     ) {
         if let Err(e) = self.try_draw_frame(
             &connection_state_resource.connection_state,
             client_history_state,
             &mut pending_player_input_action,
-            &mut exit_writer,
         ) {
             error!("Render error: {:?}", e);
         } else {

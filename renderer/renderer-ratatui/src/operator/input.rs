@@ -33,7 +33,7 @@ pub fn handle_input(
     nav: &mut NavigationStack,
     client_game_state: &ClientGameState,
     pending_player_action: &mut ResMut<PendingPlayerAction>,
-) -> bool {
+) {
     if let PlayerInputAction::MenuChangeTab = player_input_action {
         if let Some(new_tab) = try_switch_tab(nav.current()) {
             NavigationAction::Switch(new_tab).apply(nav);
@@ -42,8 +42,10 @@ pub fn handle_input(
 
     let (company_id, _company) = client_game_state.companies.iter().next().unwrap();
     match player_input_action {
-        PlayerInputAction::Quit => return NavigationAction::Quit.apply(nav),
-        PlayerInputAction::MenuBack => return NavigationAction::Pop.apply(nav),
+        PlayerInputAction::MenuBack => {
+            NavigationAction::Pop.apply(nav);
+            return;
+        }
         PlayerInputAction::MenuSelect => {
             if let Route::OrganizationList { data } = nav.current() {
                 NavigationAction::Push(Route::OrganizationView {
@@ -107,8 +109,6 @@ pub fn handle_input(
             data.handle_input(player_input_action, client_game_state)
         }
     };
-
-    true
 }
 
 pub trait InputHandler {
