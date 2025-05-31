@@ -8,8 +8,9 @@ use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LoggedCommand {
+    pub version: u32,
     pub timestamp_epoch_millis: u64,
-    pub client_id: Uuid,
+    pub source_client: Uuid,
     pub command: ClientActionCommand,
 }
 

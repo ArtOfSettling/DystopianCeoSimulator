@@ -6,6 +6,7 @@ use std::io::Write;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LoggedEvent {
+    pub version: u32,
     pub timestamp_epoch_millis: u64,
     pub event: InternalEvent,
 }

@@ -18,16 +18,17 @@ pub fn process_fan_out_commands(
     log_tx: ResMut<FanOutLogCommandSender>,
     process_tx: ResMut<FanOutClientCommandSender>,
 ) {
-    while let Ok((client_id, command)) = receiver.rx_client_action_commands.try_recv() {
+    while let Ok((source_client, command)) = receiver.rx_client_action_commands.try_recv() {
         let logged = LoggedCommand {
+            version: 1,
             timestamp_epoch_millis: current_millis(),
-            client_id,
+            source_client,
             command: command.clone(),
         };
 
         let _ = log_tx.tx_fan_out_log_commands.try_send(logged);
         let _ = process_tx
             .tx_fan_out_client_action_commands
-            .try_send((client_id, command));
+            .try_send((source_client, command));
     }
 }

@@ -26,7 +26,7 @@ pub fn setup_redrive_command_log(sender: Res<FanOutClientCommandSender>) {
         if let Ok(logged) = serde_json::from_str::<LoggedCommand>(&line) {
             let _ = sender
                 .tx_fan_out_client_action_commands
-                .try_send((logged.client_id, logged.command));
+                .try_send((logged.source_client, logged.command));
         }
     }
 

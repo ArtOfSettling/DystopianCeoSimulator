@@ -19,6 +19,7 @@ pub fn process_fan_out_events(
 ) {
     while let Ok(event) = receiver.rx_internal_events.try_recv() {
         let logged = LoggedEvent {
+            version: 1,
             timestamp_epoch_millis: current_millis(),
             event: event.clone(),
         };
