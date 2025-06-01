@@ -1,46 +1,65 @@
-use crate::NeedsWorldBroadcast;
 use crate::internal_commands::InternalCommand;
-use crate::systems::ServerEventSender;
+use crate::systems::InternalCommandReceiver;
+use crate::{ActiveConnection, Instances};
 use bevy::prelude::{Res, ResMut};
-use shared::ServerGameState;
+use log::debug;
 use tracing::info;
 
 pub fn process_internal_commands(
-    mut needs_broadcast: ResMut<NeedsWorldBroadcast>,
-    channel: Res<ServerEventSender>,
-    mut server_game_state: ResMut<ServerGameState>,
+    mut instances: ResMut<Instances>,
+    rx_internal_command: Res<InternalCommandReceiver>,
 ) {
-    if server_game_state.game_state.players.len() > 1 {
-        panic!("More than one player in the world, this is weird");
-    }
+    while let Ok(internal_command) = rx_internal_command.rx_internal_commands.try_recv() {
+        info!(
+            "Server has internal command for processing {:?}",
+            internal_command
+        );
+        match internal_command {
+            InternalCommand::Connected {
+                id,
+                addr,
+                game_id,
+                operator_mode,
+                tx_to_clients,
+                rx_from_clients,
+            } => {
+                instances.active_connections.insert(
+                    id,
+                    ActiveConnection {
+                        game_id,
+                        operator_mode: operator_mode.clone(),
+                        addr: addr.to_string(),
+                    },
+                );
 
-    if let Some(player) = server_game_state.game_state.players.first_mut() {
-        while let Ok(internal_command) = channel.rx_internal_server_commands.try_recv() {
-            info!(
-                "Server has internal command for processing {:?}",
-                internal_command
-            );
-
-            match internal_command {
-                InternalCommand::OperatorConnected { id } => {
-                    info!("attaching Operator with uuid {:?}", id);
-                    player.id = Some(id);
-                }
-                InternalCommand::OperatorDisconnected { id } => {
-                    info!("de-spawning Operator with uuid {:?}", id);
-                    player.id = None;
-                }
-                InternalCommand::DashboardViewerConnected { id } => {
-                    info!("de-spawning Dashboard Viewer with uuid {:?}", id);
-                }
-                InternalCommand::DashboardViewerDisconnected { id } => {
-                    info!("de-spawning Dashboard Viewer with uuid {:?}", id);
+                if instances.active_instances.contains_key(&game_id) {
+                    debug!(
+                        "Client id: {:?} connected to server in mode: {:?}, game: {:?} in memory",
+                        id, operator_mode, game_id
+                    );
+                    let instance = instances.active_instances.get_mut(&game_id).unwrap();
+                    instance.needs_broadcast = true;
+                } else {
+                    debug!("Client connected to server, game not in memory");
+                    instances.add_new_instance(&game_id, tx_to_clients, rx_from_clients);
+                    let instance = instances.active_instances.get_mut(&game_id).unwrap();
+                    instance.needs_broadcast = true;
                 }
             }
+            InternalCommand::Disconnected { id, game_id } => {
+                instances.active_connections.remove(&id);
 
-            needs_broadcast.0 = true;
+                if instances.active_instances.contains_key(&game_id) {
+                    debug!(
+                        "Client id: {:?} disconnected from server, game: {:?} in memory",
+                        id, game_id
+                    );
+                    let instance = instances.active_instances.get_mut(&game_id).unwrap();
+                    instance.needs_broadcast = true;
+                } else {
+                    debug!("Client disconnected from server, game not in memory");
+                }
+            }
         }
-    } else {
-        panic!("Not a single player in the world, this is weird")
     }
 }

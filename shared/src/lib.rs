@@ -3,7 +3,6 @@ pub mod game_data;
 pub mod history_data;
 pub mod resources;
 
-use bevy::prelude::Resource;
 use bevy::utils::HashMap;
 pub use client_args::*;
 pub use game_data::*;
@@ -21,8 +20,14 @@ pub enum OperatorMode {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum ClientMessage {
-    Hello { mode: OperatorMode },
-    ClientActionCommand(ClientActionCommand),
+    Hello {
+        requested_game_id: Uuid,
+        mode: OperatorMode,
+    },
+    ClientActionCommand {
+        requested_game_id: Uuid,
+        command: ClientActionCommand,
+    },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -138,6 +143,3 @@ pub enum ClientActionCommand {
         organization_budget: Budget,
     },
 }
-
-#[derive(Resource, Default, Debug)]
-pub struct PendingPlayerAction(pub Option<ClientActionCommand>);

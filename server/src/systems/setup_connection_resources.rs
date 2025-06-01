@@ -1,405 +1,254 @@
+use crate::GameClientActionCommand;
 use crate::internal_commands::InternalCommand;
-use crate::internal_commands::InternalCommand::{DashboardViewerConnected, OperatorConnected};
 use async_channel::{Receiver, Sender, unbounded};
 use async_std::io::ReadExt;
 use async_std::net::{TcpListener, TcpStream};
 use async_std::sync::Mutex;
-use async_std::task::sleep;
+use async_std::task::spawn;
 use bevy::prelude::{Commands, Resource};
-use bevy::tasks::IoTaskPool;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use futures::{AsyncWriteExt, FutureExt};
-use shared::{ClientActionCommand, ClientMessage, HelloState, OperatorMode, ServerEvent};
+use futures::AsyncWriteExt;
+use serde::{Deserialize, Serialize};
+use shared::{ClientMessage, HelloState, OperatorMode, ServerEvent};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::Duration;
-use tracing::{error, info, instrument, warn};
+use tracing::{error, info};
 use uuid::Uuid;
 
-const TARGET_SERVER_TICK: u64 = 32;
-const SLEEP_TIME_FOR_TARGET_TICK: u64 = 1000 / TARGET_SERVER_TICK;
-
-#[derive(Resource)]
-pub struct ClientActionCommandReceiver {
-    pub(crate) rx_client_action_commands: Receiver<(Uuid, ClientActionCommand)>,
+#[derive(Clone, Debug)]
+pub struct ClientInfo {
+    pub game_id: Uuid,
+    pub operator_mode: OperatorMode,
+    pub sender: Sender<ServerEvent>,
 }
 
 #[derive(Resource)]
-pub struct ServerEventSender {
-    pub(crate) tx_server_events: Sender<ServerEvent>,
-    pub(crate) rx_internal_server_commands: Receiver<InternalCommand>,
+pub struct InternalCommandReceiver {
+    pub rx_internal_commands: Receiver<InternalCommand>,
 }
 
-#[derive(Resource)]
-pub struct ConnectionResources {
-    pub(crate) active_connections: Arc<Mutex<HashMap<Uuid, ActiveConnection>>>,
-}
+pub fn start_server_system(mut commands: Commands) {
+    let connections = Arc::new(Mutex::new(HashMap::new()));
+    let (tx_to_clients, rx_to_clients) = unbounded();
+    let (tx_from_clients, rx_from_clients) = unbounded();
+    let (tx_internal_commands, rx_internal_commands) = unbounded();
 
-pub struct ActiveConnection {
-    pub(crate) operator_mode: OperatorMode,
-    pub addr: String,
-}
-
-pub fn setup_connection_resources(mut commands: Commands) {
-    let active_connections = Arc::new(Mutex::new(HashMap::new()));
-    let client_channels = Arc::new(Mutex::new(HashMap::new()));
-
-    let cloned_active_connections = active_connections.clone();
-    let cloned_client_channels = client_channels.clone();
-
-    let (tx_client_action_commands, rx_client_action_commands) = unbounded();
-    let (tx_server_events, rx_server_events) = unbounded();
-    let (tx_internal_server_commands, rx_internal_server_commands) = unbounded();
-    let cloned_tx_server_events = tx_server_events.clone();
-    let cloned_rx_internal_server_commands = rx_internal_server_commands.clone();
-
-    IoTaskPool::get()
-        .spawn(async move {
-            setup_connection_handler(
-                tx_client_action_commands,
-                rx_server_events,
-                tx_internal_server_commands,
-                cloned_active_connections,
-                cloned_client_channels,
-            )
-            .await
-        })
-        .detach();
-
-    commands.insert_resource(ConnectionResources { active_connections });
-
-    commands.insert_resource(ClientActionCommandReceiver {
-        rx_client_action_commands,
+    commands.insert_resource(InternalCommandReceiver {
+        rx_internal_commands: rx_internal_commands.clone(),
     });
 
-    commands.insert_resource(ServerEventSender {
-        tx_server_events: cloned_tx_server_events,
-        rx_internal_server_commands: cloned_rx_internal_server_commands,
-    });
+    spawn(broadcast_loop(rx_to_clients, connections.clone()));
+    spawn(connection_listener_loop(
+        connections,
+        tx_to_clients,
+        tx_from_clients,
+        rx_from_clients,
+        tx_internal_commands,
+    ));
 }
 
-async fn setup_connection_handler(
-    client_action_command_sender: Sender<(Uuid, ClientActionCommand)>,
-    server_event_receiver: Receiver<ServerEvent>,
-    tx_internal_server_commands: Sender<InternalCommand>,
-    active_connections: Arc<Mutex<HashMap<Uuid, ActiveConnection>>>,
-    client_channels: Arc<Mutex<HashMap<Uuid, Sender<ServerEvent>>>>,
+async fn broadcast_loop(
+    rx_to_clients: Receiver<ServerEvent>,
+    clients: Arc<Mutex<HashMap<Uuid, ClientInfo>>>,
 ) {
-    info!("Spinning up server");
-    let cloned_client_channels = client_channels.clone();
-    IoTaskPool::get()
-        .spawn({
-            info!("Spinning up broadcaster task");
-            let cloned_client_channels = cloned_client_channels.clone();
-            async move {
-                while let Ok(event) = server_event_receiver.recv().await {
-                    let channels = cloned_client_channels.lock().await;
-                    for (uuid, tx) in channels.iter() {
-                        if let Err(e) = tx.send(event.clone()).await {
-                            error!("Failed to broadcast event to client {uuid}: {:?}", e);
-                        }
-                    }
-                }
+    while let Ok(event) = rx_to_clients.recv().await {
+        let all_clients = clients.lock().await;
+        for (uuid, client_info) in all_clients.iter() {
+            if let Err(e) = client_info.sender.send(event.clone()).await {
+                error!("Failed to send to client {uuid}: {e:?}");
             }
-        })
-        .detach();
+        }
+    }
+}
 
+async fn connection_listener_loop(
+    clients: Arc<Mutex<HashMap<Uuid, ClientInfo>>>,
+    tx_to_clients: Sender<ServerEvent>,
+    tx_from_clients: Sender<GameClientActionCommand>,
+    rx_from_clients: Receiver<GameClientActionCommand>,
+    tx_internal_commands: Sender<InternalCommand>,
+) {
     let addr = SocketAddr::from(([127, 0, 0, 1], 12345));
-    match TcpListener::bind(addr).await {
-        Ok(listener) => {
-            info!("Server listening on 127.0.0.1:12345");
-            loop {
-                if let Ok((mut stream, addr)) = listener.accept().await {
-                    info!("New connection from: {}", addr);
+    let listener = TcpListener::bind(addr).await.expect("Failed to bind TCP");
+    info!("Server listening on {addr}");
 
-                    let hello = wait_for_hello(&mut stream).await;
-                    info!("Received hello: {:?}", hello);
+    while let Ok((stream, addr)) = listener.accept().await {
+        let tx_to_clients = tx_to_clients.clone();
+        let tx_from_clients = tx_from_clients.clone();
+        let tx_internal_commands = tx_internal_commands.clone();
+        let rx_from_clients = rx_from_clients.clone();
+        let clients = clients.clone();
 
-                    if let Some(client_hello) = hello {
-                        match client_hello {
-                            OperatorMode::Operator => {
-                                let already_connected = {
-                                    let map = active_connections.lock().await;
-                                    map.values()
-                                        .any(|conn| conn.operator_mode == OperatorMode::Operator)
-                                };
+        spawn(async move {
+            handle_connection(
+                stream,
+                addr,
+                clients,
+                tx_to_clients,
+                tx_from_clients,
+                rx_from_clients,
+                tx_internal_commands,
+            )
+            .await;
+        });
+    }
+}
 
-                                if already_connected {
-                                    error!(
-                                        "An operator is already connected. Rejecting new operator connection from {}",
-                                        addr
-                                    );
+async fn handle_connection(
+    mut stream: TcpStream,
+    addr: SocketAddr,
+    clients: Arc<Mutex<HashMap<Uuid, ClientInfo>>>,
+    tx_to_clients: Sender<ServerEvent>,
+    tx_from_clients: Sender<GameClientActionCommand>,
+    rx_from_clients: Receiver<GameClientActionCommand>,
+    tx_internal_commands: Sender<InternalCommand>,
+) {
+    let client_message = read_bincode_message::<ClientMessage>(&mut stream).await;
+    if let Ok(ClientMessage::Hello {
+        requested_game_id,
+        mode,
+    }) = client_message
+    {
+        let client_id = Uuid::new_v4();
 
-                                    // Send rejection back to the client.
-                                    let _ = send_bincode_message(
-                                        &mut stream,
-                                        &ServerEvent::Hello(HelloState::Rejected {
-                                            reason: "Operator already connected".to_string(),
-                                        }),
-                                    )
-                                    .await;
-
-                                    continue;
-                                } else {
-                                    // Send acceptance back to the client.
-                                    let _ = send_bincode_message(
-                                        &mut stream,
-                                        &ServerEvent::Hello(HelloState::Accepted),
-                                    )
-                                    .await;
-                                }
-
-                                let (tx, rx) = unbounded();
-                                let addr_str = addr.to_string();
-                                let uuid = Uuid::new_v5(&Uuid::NAMESPACE_DNS, addr_str.as_bytes());
-
-                                {
-                                    cloned_client_channels.lock().await.insert(uuid, tx);
-                                }
-
-                                {
-                                    let mut map = active_connections.lock().await;
-                                    map.insert(
-                                        uuid,
-                                        ActiveConnection {
-                                            addr: addr_str,
-                                            operator_mode: OperatorMode::Operator,
-                                        },
-                                    );
-                                }
-
-                                if let Err(e) = tx_internal_server_commands
-                                    .send(OperatorConnected { id: uuid })
-                                    .await
-                                {
-                                    error!("[Operator] Failed to send internal command: {:?}", e);
-                                }
-
-                                let tx = client_action_command_sender.clone();
-
-                                let cloned_tx_internal_server_commands =
-                                    tx_internal_server_commands.clone();
-
-                                let cloned_active_connections = active_connections.clone();
-
-                                IoTaskPool::get()
-                                    .spawn(async move {
-                                        handle_operator_client(
-                                            uuid,
-                                            stream,
-                                            tx,
-                                            cloned_tx_internal_server_commands,
-                                            rx,
-                                            cloned_active_connections,
-                                        )
-                                        .await
-                                    })
-                                    .detach();
-                            }
-                            OperatorMode::DashboardViewer => {
-                                // Send acceptance back to the client.
-                                let _ = send_bincode_message(
-                                    &mut stream,
-                                    &ServerEvent::Hello(HelloState::Accepted),
-                                )
-                                .await;
-
-                                let (tx, rx) = unbounded();
-                                let addr_str = addr.to_string();
-                                let uuid = Uuid::new_v5(&Uuid::NAMESPACE_DNS, addr_str.as_bytes());
-
-                                {
-                                    cloned_client_channels.lock().await.insert(uuid, tx);
-                                }
-
-                                {
-                                    let mut map = active_connections.lock().await;
-                                    map.insert(
-                                        uuid,
-                                        ActiveConnection {
-                                            addr: addr_str,
-                                            operator_mode: OperatorMode::DashboardViewer,
-                                        },
-                                    );
-                                }
-
-                                if let Err(e) = tx_internal_server_commands
-                                    .send(DashboardViewerConnected { id: uuid })
-                                    .await
-                                {
-                                    error!(
-                                        "[DashboardViewer] Failed to send internal command: {:?}",
-                                        e
-                                    );
-                                }
-
-                                let cloned_tx_internal_server_commands =
-                                    tx_internal_server_commands.clone();
-
-                                let cloned_active_connections = active_connections.clone();
-
-                                IoTaskPool::get()
-                                    .spawn(async move {
-                                        handle_dashboard_viewer_client(
-                                            uuid,
-                                            stream,
-                                            cloned_tx_internal_server_commands,
-                                            rx,
-                                            cloned_active_connections,
-                                        )
-                                        .await
-                                    })
-                                    .detach();
-                            }
-                        }
-                    } else {
-                        error!("Received None hello");
-                    }
-                }
-
-                sleep(Duration::from_millis(SLEEP_TIME_FOR_TARGET_TICK)).await;
+        if mode == OperatorMode::Operator {
+            let locked = clients.lock().await;
+            if locked.values().any(|c| {
+                c.game_id == requested_game_id && c.operator_mode == OperatorMode::Operator
+            }) {
+                let _ = send_bincode_message(
+                    &mut stream,
+                    &ServerEvent::Hello(HelloState::Rejected {
+                        reason: "Operator already connected to this game".to_string(),
+                    }),
+                )
+                .await;
+                return;
             }
         }
-        Err(e) => {
-            error!("Could not bind to port {}: {:?}", addr, e);
+
+        let _ = send_bincode_message(&mut stream, &ServerEvent::Hello(HelloState::Accepted)).await;
+        let (tx, rx) = unbounded();
+
+        clients.lock().await.insert(
+            client_id,
+            ClientInfo {
+                game_id: requested_game_id,
+                operator_mode: mode.clone(),
+                sender: tx.clone(),
+            },
+        );
+
+        let cloned_tx_internal_commands = tx_internal_commands.clone();
+        spawn(forward_to_client_loop(stream.clone(), rx));
+        spawn(read_from_client_loop(
+            stream,
+            clients.clone(),
+            client_id,
+            requested_game_id,
+            tx_from_clients,
+            cloned_tx_internal_commands,
+        ));
+
+        tx_internal_commands
+            .send(InternalCommand::Connected {
+                id: client_id,
+                addr,
+                game_id: requested_game_id,
+                operator_mode: mode.clone(),
+                tx_to_clients,
+                rx_from_clients,
+            })
+            .await
+            .expect("Failed to send internal command");
+    }
+}
+
+async fn forward_to_client_loop(mut stream: TcpStream, rx: Receiver<ServerEvent>) {
+    while let Ok(event) = rx.recv().await {
+        if let Err(e) = send_bincode_message(&mut stream, &event).await {
+            error!("Failed to send event: {e:?}");
+            break;
         }
     }
 }
 
-#[instrument(skip_all, fields(client_id = %uuid))]
-async fn handle_operator_client(
-    uuid: Uuid,
+async fn read_from_client_loop(
     mut stream: TcpStream,
-    tx_client_action_commands: Sender<(Uuid, ClientActionCommand)>,
-    tx_internal_server_commands: Sender<InternalCommand>,
-    rx_server_events: Receiver<ServerEvent>,
-    active_connections: Arc<Mutex<HashMap<Uuid, ActiveConnection>>>,
+    clients: Arc<Mutex<HashMap<Uuid, ClientInfo>>>,
+    uuid: Uuid,
+    game_id: Uuid,
+    tx: Sender<GameClientActionCommand>,
+    tx_internal_commands: Sender<InternalCommand>,
 ) {
     loop {
-        futures::select! {
-            maybe_server_event = rx_server_events.recv().fuse() => {
-                if let Ok(server_event) = maybe_server_event {
-                    if let Err(e) = send_bincode_message(&mut stream, &server_event).await {
-                       error!("[Operator] Failed to send broadcast to client: {:?}", e);
-                    }
+        match read_bincode_message::<ClientMessage>(&mut stream).await {
+            Ok(ClientMessage::ClientActionCommand {
+                requested_game_id,
+                command,
+            }) => {
+                if tx
+                    .send(GameClientActionCommand {
+                        source_client_id: uuid,
+                        game_id,
+                        command,
+                    })
+                    .await
+                    .is_err()
+                {
+                    info!("Client {uuid} disconnected");
+                    let mut clients_guard = clients.lock().await;
+                    clients_guard.remove(&uuid);
+                    drop(clients_guard);
+                    let _ = tx_internal_commands
+                        .send(InternalCommand::Disconnected {
+                            id: uuid,
+                            game_id: requested_game_id,
+                        })
+                        .await;
+                    break;
                 }
-            },
-
-            client_message = read_bincode_message::<ClientMessage>(&mut stream).fuse() => {
-                match client_message {
-                    Ok(ClientMessage::ClientActionCommand(client_action_command)) => {
-                        info!("[Operator] Received action command from client: {:?}", client_action_command);
-                        tx_client_action_commands.send((uuid, client_action_command)).await.expect("Failed to forward command");
-                    }
-                    Ok(ClientMessage::Hello{ .. }) => {
-                        warn!("[Operator] Received another client hello, this is weird.");
-                    }
-                    Err(e) => {
-                        error!("[Operator] Client disconnected or error reading from stream: {:?}", e);
-
-                        {
-                            let mut map = active_connections.lock().await;
-                            map.remove(&uuid);
-                        }
-
-                        if let Err(e) = tx_internal_server_commands.send(
-                            InternalCommand::OperatorDisconnected { id: uuid }
-                        ).await {
-                            error!("[Operator] Failed to send PlayerDisconnected command: {:?}", e);
-                        }
-
-                        break;
-                    }
-                }
+            }
+            Ok(_) => {}
+            Err(e) => {
+                info!("Client {uuid} disconnected or errored: {e}");
+                let mut clients_guard = clients.lock().await;
+                clients_guard.remove(&uuid);
+                drop(clients_guard);
+                let _ = tx_internal_commands
+                    .send(InternalCommand::Disconnected { id: uuid, game_id })
+                    .await;
+                break;
             }
         }
     }
 }
 
-#[instrument(skip_all, fields(client_id = %uuid))]
-async fn handle_dashboard_viewer_client(
-    uuid: Uuid,
-    mut stream: TcpStream,
-    tx_internal_server_commands: Sender<InternalCommand>,
-    rx_server_events: Receiver<ServerEvent>,
-    active_connections: Arc<Mutex<HashMap<Uuid, ActiveConnection>>>,
-) {
-    let mut length_buf = [0; 4];
-
-    loop {
-        futures::select! {
-            maybe_server_event = rx_server_events.recv().fuse() => {
-                if let Ok(server_event) = maybe_server_event {
-                    if let Err(e) = send_bincode_message(&mut stream, &server_event).await {
-                       error!("[DashboardViewer] Failed to send broadcast to client: {:?}", e);
-                    }
-                }
-            },
-            maybe_length_buf = stream.read_exact(&mut length_buf).fuse() => {
-                match maybe_length_buf {
-                    Ok(_) => {}
-                    Err(e) => {
-                        error!("[DashboardViewer] Dashboard Viewer disconnected or error reading from stream: {:?}", e);
-
-                        {
-                            let mut map = active_connections.lock().await;
-                            map.remove(&uuid);
-                        }
-
-                        if let Err(e) = tx_internal_server_commands.send(
-                            InternalCommand::DashboardViewerDisconnected { id: uuid }
-                        ).await {
-                            error!("[DashboardViewer] Failed to send PlayerDisconnected command: {:?}", e);
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-    }
-}
-
-async fn wait_for_hello(stream: &mut TcpStream) -> Option<OperatorMode> {
-    match read_bincode_message::<ClientMessage>(stream).await {
-        Ok(ClientMessage::Hello { mode }) => {
-            info!("Received hello message from client");
-            Some(mode)
-        }
-        Ok(other) => {
-            warn!("Expected hello message, but received: {:?}", other);
-            None
-        }
-        Err(e) => {
-            error!("Failed to deserialize hello message: {:?}", e);
-            None
-        }
-    }
-}
-
-async fn read_bincode_message<T: serde::de::DeserializeOwned>(
+async fn read_bincode_message<T: for<'a> Deserialize<'a>>(
     stream: &mut TcpStream,
 ) -> anyhow::Result<T> {
     let mut length_buf = [0u8; 4];
-    stream.read_exact(&mut length_buf).await?;
+    if let Err(e) = stream.read_exact(&mut length_buf).await {
+        return Err(anyhow::anyhow!("Client disconnected or stream error: {e}"));
+    }
+
     let length = (&length_buf[..]).read_u32::<BigEndian>()? as usize;
     let mut buf = vec![0u8; length];
-    stream.read_exact(&mut buf).await?;
-    let message = bincode::deserialize(&buf)?;
-    Ok(message)
+
+    if let Err(e) = stream.read_exact(&mut buf).await {
+        return Err(anyhow::anyhow!("Client disconnected or stream error: {e}"));
+    }
+
+    let value = bincode::deserialize(&buf)?;
+    Ok(value)
 }
 
-async fn send_bincode_message<T: serde::Serialize>(
-    stream: &mut TcpStream,
-    value: &T,
-) -> anyhow::Result<()> {
-    let serialized = bincode::serialize(value)?;
-    let length = serialized.len() as u32;
-
-    let mut message = Vec::with_capacity(4 + serialized.len());
-    message.write_u32::<BigEndian>(length)?;
-    message.extend_from_slice(&serialized);
-
-    stream.write_all(&message).await?;
+async fn send_bincode_message<T: Serialize>(stream: &mut TcpStream, msg: &T) -> anyhow::Result<()> {
+    let serialized = bincode::serialize(msg)?;
+    let mut buf = vec![0u8; 4 + serialized.len()];
+    (&mut buf[..4]).write_u32::<BigEndian>(serialized.len() as u32)?;
+    buf[4..].copy_from_slice(&serialized);
+    stream.write_all(&buf).await?;
     Ok(())
 }

@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 pub const MAX_HISTORY_POINTS: usize = 50;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct HistoryState {
     pub players: HashMap<Uuid, PlayerHistory>,
     pub organizations: HashMap<Uuid, OrganizationHistory>,

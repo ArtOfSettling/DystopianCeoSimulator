@@ -1,3 +1,4 @@
+use crate::systems::GAME_ID;
 use async_channel::{Receiver, Sender, bounded};
 use async_std::io::ReadExt;
 use async_std::net::TcpStream;
@@ -49,6 +50,7 @@ pub fn setup_connection_resources(
                 match TcpStream::connect("127.0.0.1:12345").await {
                     Ok(mut stream) => {
                         let serialized = bincode::serialize(&ClientMessage::Hello {
+                            requested_game_id: GAME_ID,
                             mode: operator_mode.clone(),
                         })
                         .unwrap();

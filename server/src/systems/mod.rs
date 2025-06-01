@@ -1,57 +1,47 @@
+mod redrive_event_logs;
+mod create_empty_world_state;
 mod process_broadcast_world_state;
 pub(crate) mod process_clear_needs_state_update;
-mod process_client_commands;
-mod process_command_log;
 pub(crate) mod process_company_updates;
-mod process_event_log;
-mod process_fan_out_commands;
-mod process_fan_out_events;
+mod process_commands;
+mod process_events;
 mod process_internal_commands;
-mod process_internal_events;
 pub(crate) mod process_organization_updates;
 mod process_print_active_connections;
 mod setup_command_log;
 mod setup_connection_resources;
 mod setup_event_log;
-mod setup_fan_out_commands;
-mod setup_fan_out_events;
-mod setup_redrive_command_log;
-mod setup_redrive_event_log;
-mod setup_world_state;
 
-use crate::NeedsWorldBroadcast;
+use crate::{GameClientInternalEvent, Instance};
+pub use redrive_event_logs::*;
+pub use create_empty_world_state::*;
 pub use process_broadcast_world_state::*;
-pub use process_client_commands::*;
-pub use process_command_log::*;
-pub use process_event_log::*;
-pub use process_fan_out_commands::*;
-pub use process_fan_out_events::*;
+pub use process_commands::*;
+pub use process_events::*;
 pub use process_internal_commands::*;
-pub use process_internal_events::*;
 pub use process_print_active_connections::*;
+use serde::{Deserialize, Serialize};
 pub use setup_command_log::*;
 pub use setup_connection_resources::*;
 pub use setup_event_log::*;
-pub use setup_fan_out_commands::*;
-pub use setup_fan_out_events::*;
-pub use setup_redrive_command_log::*;
-pub use setup_redrive_event_log::*;
-pub use setup_world_state::*;
 use shared::{
-    CompanyHistory, Employment, InternalEvent, MAX_HISTORY_POINTS, OrganizationHistory,
-    OrganizationRole, PlayerHistory, ServerGameState, ServerHistoryState,
+    ClientActionCommand, CompanyHistory, Employment, InternalEvent, MAX_HISTORY_POINTS,
+    OrganizationHistory, OrganizationRole, PlayerHistory,
 };
 use std::collections::VecDeque;
+use std::io::Write;
+use std::time::{SystemTime, UNIX_EPOCH};
+use uuid::Uuid;
 
-pub fn apply_event(
-    internal_event: &InternalEvent,
-    server_game_state: &mut ServerGameState,
-    server_history_state: &mut ServerHistoryState,
-    needs_world_broadcast: &mut NeedsWorldBroadcast,
-) {
+pub fn apply_event(internal_event: &InternalEvent, instance: &mut Instance) {
     match internal_event {
         InternalEvent::RemoveEmployedStatus { employee_id } => {
-            if let Some(entity) = server_game_state.game_state.entities.get_mut(employee_id) {
+            if let Some(entity) = instance
+                .instance_game
+                .game_state
+                .entities
+                .get_mut(employee_id)
+            {
                 entity.employment = None;
             }
         }
@@ -60,7 +50,12 @@ pub fn apply_event(
             organization_id,
             employee_id,
         } => {
-            if let Some(entity) = server_game_state.game_state.entities.get_mut(employee_id) {
+            if let Some(entity) = instance
+                .instance_game
+                .game_state
+                .entities
+                .get_mut(employee_id)
+            {
                 entity.employment = Some(Employment {
                     organization_id: *organization_id,
                     role: OrganizationRole::SalesRep,
@@ -74,25 +69,25 @@ pub fn apply_event(
         }
 
         InternalEvent::DecrementReputation { amount } => {
-            if let Some(player) = server_game_state.game_state.players.first_mut() {
+            if let Some(player) = instance.instance_game.game_state.players.first_mut() {
                 player.perception.reputation -= amount;
             }
         }
 
         InternalEvent::IncrementReputation { amount } => {
-            if let Some(player) = server_game_state.game_state.players.first_mut() {
+            if let Some(player) = instance.instance_game.game_state.players.first_mut() {
                 player.perception.reputation += amount;
             }
         }
 
         InternalEvent::DecrementMoney { amount } => {
-            if let Some(player) = server_game_state.game_state.players.first_mut() {
+            if let Some(player) = instance.instance_game.game_state.players.first_mut() {
                 player.financials.actual_cash -= amount;
             }
         }
 
         InternalEvent::IncrementMoney { amount } => {
-            if let Some(player) = server_game_state.game_state.players.first_mut() {
+            if let Some(player) = instance.instance_game.game_state.players.first_mut() {
                 player.financials.actual_cash += amount;
             }
         }
@@ -101,7 +96,12 @@ pub fn apply_event(
             employee_id,
             amount,
         } => {
-            if let Some(entity) = server_game_state.game_state.entities.get_mut(employee_id) {
+            if let Some(entity) = instance
+                .instance_game
+                .game_state
+                .entities
+                .get_mut(employee_id)
+            {
                 if let Some(employment) = &mut entity.employment {
                     employment.satisfaction += amount;
                 }
@@ -112,7 +112,8 @@ pub fn apply_event(
             organization_id,
             amount,
         } => {
-            if let Some(organization) = server_game_state
+            if let Some(organization) = instance
+                .instance_game
                 .game_state
                 .organizations
                 .get_mut(organization_id)
@@ -125,7 +126,8 @@ pub fn apply_event(
             organization_id,
             amount,
         } => {
-            if let Some(organization) = server_game_state
+            if let Some(organization) = instance
+                .instance_game
                 .game_state
                 .organizations
                 .get_mut(organization_id)
@@ -138,7 +140,12 @@ pub fn apply_event(
             employee_id,
             amount,
         } => {
-            if let Some(entity) = server_game_state.game_state.entities.get_mut(employee_id) {
+            if let Some(entity) = instance
+                .instance_game
+                .game_state
+                .entities
+                .get_mut(employee_id)
+            {
                 if let Some(employment) = &mut entity.employment {
                     employment.salary += amount;
                 }
@@ -149,7 +156,8 @@ pub fn apply_event(
             organization_id,
             employee_id,
         } => {
-            if let Some(organization) = server_game_state
+            if let Some(organization) = instance
+                .instance_game
                 .game_state
                 .organizations
                 .get_mut(organization_id)
@@ -162,7 +170,12 @@ pub fn apply_event(
             employee_id,
             new_role,
         } => {
-            if let Some(entity) = server_game_state.game_state.entities.get_mut(employee_id) {
+            if let Some(entity) = instance
+                .instance_game
+                .game_state
+                .entities
+                .get_mut(employee_id)
+            {
                 if let Some(employment) = &mut entity.employment {
                     employment.role = *new_role;
                 }
@@ -173,7 +186,8 @@ pub fn apply_event(
             organization_id,
             financials,
         } => {
-            if let Some(organization) = server_game_state
+            if let Some(organization) = instance
+                .instance_game
                 .game_state
                 .organizations
                 .get_mut(organization_id)
@@ -186,7 +200,8 @@ pub fn apply_event(
             organization_id,
             initiatives,
         } => {
-            if let Some(organization) = server_game_state
+            if let Some(organization) = instance
+                .instance_game
                 .game_state
                 .organizations
                 .get_mut(organization_id)
@@ -199,7 +214,8 @@ pub fn apply_event(
             organization_id,
             perception,
         } => {
-            if let Some(organization) = server_game_state
+            if let Some(organization) = instance
+                .instance_game
                 .game_state
                 .organizations
                 .get_mut(organization_id)
@@ -212,7 +228,8 @@ pub fn apply_event(
             organization_id,
             budget,
         } => {
-            if let Some(organization) = server_game_state
+            if let Some(organization) = instance
+                .instance_game
                 .game_state
                 .organizations
                 .get_mut(organization_id)
@@ -225,7 +242,12 @@ pub fn apply_event(
             company_id,
             financials,
         } => {
-            if let Some(company) = server_game_state.game_state.companies.get_mut(company_id) {
+            if let Some(company) = instance
+                .instance_game
+                .game_state
+                .companies
+                .get_mut(company_id)
+            {
                 company.financials = financials.clone();
             }
         }
@@ -236,7 +258,8 @@ pub fn apply_event(
             new_organization_history_points,
         } => {
             for (player_id, history_point) in new_player_history_points {
-                let player_history = server_history_state
+                let player_history = instance
+                    .instance_game
                     .history_state
                     .players
                     .entry(*player_id)
@@ -252,7 +275,8 @@ pub fn apply_event(
             }
 
             for (company_id, history_point) in new_company_history_points {
-                let company_history = server_history_state
+                let company_history = instance
+                    .instance_game
                     .history_state
                     .companies
                     .entry(*company_id)
@@ -268,7 +292,8 @@ pub fn apply_event(
             }
 
             for (organization_id, history_point) in new_organization_history_points {
-                let org_history = server_history_state
+                let org_history = instance
+                    .instance_game
                     .history_state
                     .organizations
                     .entry(*organization_id)
@@ -283,8 +308,92 @@ pub fn apply_event(
         }
 
         InternalEvent::AdvanceWeek => {
-            server_game_state.game_state.week += 1;
-            needs_world_broadcast.0 = true;
+            instance.instance_game.game_state.week += 1;
+            instance.needs_broadcast = true;
         }
     }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LoggedCommand {
+    pub version: u32,
+    pub timestamp_epoch_millis: u64,
+    pub source_client_id: Uuid,
+    pub game_id: Uuid,
+    pub command: ClientActionCommand,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LoggedEvent {
+    pub version: u32,
+    pub timestamp_epoch_millis: u64,
+    pub game_id: Uuid,
+    pub event: InternalEvent,
+}
+
+pub fn write_event_to_log_stream(
+    event_log: &mut EventLog,
+    game_id: &Uuid,
+    event: GameClientInternalEvent,
+) {
+    let logged = LoggedEvent {
+        version: 1,
+        timestamp_epoch_millis: current_millis(),
+        game_id: event.game_id,
+        event: event.internal_event.clone(),
+    };
+
+    let writer = event_log.writer.get_writer(game_id);
+    match serde_json::to_string(&logged) {
+        Ok(serialized) => {
+            if let Err(e) = writeln!(writer, "{}", serialized) {
+                eprintln!("Failed to write to log file: {}", e);
+            }
+        }
+        Err(e) => {
+            eprintln!("Failed to serialize LoggedEvent: {}", e);
+        }
+    }
+
+    if let Err(e) = writer.flush() {
+        eprintln!("Failed to flush log file: {}", e);
+    }
+}
+
+pub fn write_command_to_log_stream(
+    command_log: &mut CommandLog,
+    game_id: &Uuid,
+    source_client_id: &Uuid,
+    command: ClientActionCommand,
+) {
+    let logged = LoggedCommand {
+        version: 1,
+        timestamp_epoch_millis: current_millis(),
+        source_client_id: *source_client_id,
+        game_id: *game_id,
+        command: command.clone(),
+    };
+
+    let writer = command_log.writer.get_writer(game_id);
+    match serde_json::to_string(&logged) {
+        Ok(serialized) => {
+            if let Err(e) = writeln!(writer, "{}", serialized) {
+                eprintln!("Failed to write to log file: {}", e);
+            }
+        }
+        Err(e) => {
+            eprintln!("Failed to serialize LoggedCommand: {}", e);
+        }
+    }
+
+    if let Err(e) = writer.flush() {
+        eprintln!("Failed to flush log file: {}", e);
+    }
+}
+
+fn current_millis() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_millis() as u64
 }

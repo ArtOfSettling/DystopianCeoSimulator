@@ -1,34 +1,37 @@
-use crate::find_latest_log_file_in_folder;
+use crate::systems::get_event_stream;
 use bevy::prelude::{Commands, Resource};
-use chrono::Utc;
-use std::fs::{File, OpenOptions, create_dir_all};
+use std::collections::HashMap;
+use std::fs::File;
 use std::io::BufWriter;
-use std::path::PathBuf;
+use uuid::Uuid;
 
 #[derive(Resource)]
 pub struct CommandLog {
-    pub writer: BufWriter<File>,
+    pub writer: CommandLogWriter,
+}
+
+pub struct CommandLogWriter {
+    pub writers: HashMap<Uuid, BufWriter<File>>,
+}
+
+impl CommandLogWriter {
+    pub fn get_writer(&mut self, game_id: &Uuid) -> &mut BufWriter<File> {
+        if !self.writers.contains_key(game_id) {
+            let file = new_command_log(game_id);
+            self.writers.insert(*game_id, BufWriter::new(file));
+        }
+        self.writers.get_mut(game_id).unwrap()
+    }
 }
 
 pub fn setup_command_log(mut commands: Commands) {
-    let mut base_path = PathBuf::from("_out/command_stream");
-    create_dir_all(&base_path).expect("Failed to create log directory");
-
-    let log_path = find_latest_log_file_in_folder("_out/command_stream").unwrap_or_else(|| {
-        let timestamp = Utc::now().format("session-%Y%m%d-%H%M%S.ndjson");
-        base_path.push(timestamp.to_string());
-        base_path
-    });
-
-    let log_file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&log_path)
-        .expect("Failed to open log file");
-
     commands.insert_resource(CommandLog {
-        writer: BufWriter::new(log_file),
+        writer: CommandLogWriter {
+            writers: Default::default(),
+        },
     });
+}
 
-    println!("Using log file: {}", log_path.display());
+fn new_command_log(game_id: &Uuid) -> File {
+    get_event_stream(game_id, "command_stream")
 }

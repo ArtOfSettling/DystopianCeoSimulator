@@ -4,24 +4,22 @@ use crate::deterministic_randomization::{
     generate_organization_chart, generate_organization_types_for_company,
     generate_pet_type_for_rank, generate_unique_pet_name,
 };
-use bevy::prelude::ResMut;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use sha2::{Digest, Sha256};
 use shared::{
     Budget, Company, CompanyRelation, CompanyType, Employment, Entity, EntityFlag, EntityType,
     Financials, GameState, Organization, OrganizationRole, Origin, Owner, Perception, Player,
-    ServerGameState,
 };
 use std::collections::{HashMap, VecDeque};
 use tracing::info;
 use uuid::Uuid;
 
-pub fn setup_world_state(mut server_game_state: ResMut<ServerGameState>) {
-    server_game_state.game_state = generate_game_state_deterministic(12345, 0, 7);
+pub fn create_empty_world_state() -> GameState {
+    let mut new_game_state = generate_game_state_deterministic(12345, 0, 7);
 
     info!("spawning player");
-    server_game_state.game_state.players.push(Player {
+    new_game_state.players.push(Player {
         id: None,
         financials: Financials {
             actual_cash: 1_000_000,
@@ -34,6 +32,8 @@ pub fn setup_world_state(mut server_game_state: ResMut<ServerGameState>) {
             reputation: 0,
         },
     });
+
+    new_game_state
 }
 
 pub fn generate_game_state_deterministic(seed: u64, week: u16, org_count: usize) -> GameState {

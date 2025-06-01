@@ -5,58 +5,105 @@ mod plugins;
 mod systems;
 
 use crate::systems::{
-    process_broadcast_world_state, process_client_commands, process_command_log, process_event_log,
-    process_fan_out_commands, process_fan_out_events, process_internal_commands,
-    process_internal_events, process_print_active_connections, setup_command_log,
-    setup_connection_resources, setup_event_log, setup_fan_out_commands, setup_fan_out_events,
-    setup_redrive_command_log, setup_redrive_event_log, setup_world_state,
+    redrive_event_logs, create_empty_world_state, process_broadcast_world_state,
+    process_commands, process_events, process_internal_commands,
+    process_print_active_connections, setup_command_log, setup_event_log, start_server_system,
 };
 use bevy::MinimalPlugins;
 use bevy::app::{App, FixedUpdate, PluginGroup, ScheduleRunnerPlugin, Startup};
 use bevy::prelude::IntoSystemConfigs;
 use bevy::time::common_conditions::on_timer;
 use bevy::time::{Fixed, Time};
-use cli::Cli;
+use std::collections::HashMap;
 use std::time::Duration;
 use tracing::info;
 use tracing_appender::non_blocking::WorkerGuard;
 
-#[derive(Default, Resource)]
-pub struct NeedsWorldBroadcast(pub bool);
-
-#[derive(Default, Resource)]
-pub struct NeedsStateUpdate(pub bool);
-
-#[derive(Resource)]
-pub struct InternalEventSender {
-    pub(crate) tx_internal_events: Sender<InternalEvent>,
+#[derive(Resource, Default)]
+pub struct Instances {
+    pub active_connections: HashMap<Uuid, ActiveConnection>,
+    pub active_instances: HashMap<Uuid, Instance>,
 }
 
-#[derive(Resource)]
-pub struct InternalEventReceiver {
-    pub(crate) rx_internal_events: Receiver<InternalEvent>,
+#[derive(Clone)]
+pub struct Instance {
+    pub instance_game: GameInstanceData,
+    pub needs_broadcast: bool,
+    pub needs_state_update: bool,
+    pub tx_internal_events: Sender<GameClientInternalEvent>,
+    pub rx_internal_events: Receiver<GameClientInternalEvent>,
+    pub tx_to_clients: Sender<ServerEvent>,
+    pub rx_from_client: Receiver<GameClientActionCommand>,
+}
+
+#[derive(Clone, Debug)]
+pub struct GameClientActionCommand {
+    pub source_client_id: Uuid,
+    pub game_id: Uuid,
+    pub command: ClientActionCommand,
+}
+
+#[derive(Clone, Debug)]
+pub struct GameClientInternalEvent {
+    pub game_id: Uuid,
+    pub internal_event: InternalEvent,
+}
+
+#[derive(Clone)]
+pub struct ActiveConnection {
+    pub game_id: Uuid,
+    pub operator_mode: OperatorMode,
+    pub addr: String,
+}
+
+impl Instances {
+    pub fn add_new_instance(
+        &mut self,
+        game_id: &Uuid,
+        tx_to_clients: Sender<ServerEvent>,
+        rx_from_clients: Receiver<GameClientActionCommand>,
+    ) {
+        // send to clients
+        // receive from clients
+        let (tx_internal_events, rx_internal_events) = unbounded();
+
+        let mut new_instance = Instance {
+            instance_game: GameInstanceData {
+                game_state: create_empty_world_state(),
+                history_state: Default::default(),
+            },
+            needs_broadcast: false,
+            needs_state_update: false,
+            tx_internal_events,
+            rx_internal_events,
+            tx_to_clients,
+            rx_from_client: rx_from_clients,
+        };
+        redrive_event_logs(&mut new_instance, *game_id);
+        self.active_instances.insert(*game_id, new_instance);
+    }
+
+    pub fn remove_existing_instance(&mut self, instance_id: &Uuid) {
+        self.active_instances.remove(instance_id);
+    }
 }
 
 fn main() -> anyhow::Result<()> {
     let _guard = setup_logging();
     info!("Logging configured");
 
-    let cli = Cli::parse();
-    info!("Cli: {:?}", cli);
-
-    let (tx_internal_events, rx_internal_events) = unbounded();
-
     App::new()
         .add_plugins(MinimalPlugins.set(ScheduleRunnerPlugin::run_loop(Duration::from_millis(10))))
         .add_plugins(AsyncStdReadySignalPlugin { port: 5555 })
         .insert_resource(Time::<Fixed>::from_hz(128.0))
-        .insert_resource(ServerGameState::default())
-        .insert_resource(ServerHistoryState::default())
-        .insert_resource(NeedsWorldBroadcast::default())
-        .insert_resource(NeedsStateUpdate::default())
-        .insert_resource(InternalEventSender { tx_internal_events })
-        .insert_resource(InternalEventReceiver { rx_internal_events })
-        .add_systems(Startup, build_setup_chain(&cli))
+        .insert_resource(Instances {
+            active_connections: Default::default(),
+            active_instances: Default::default(),
+        })
+        .add_systems(
+            Startup,
+            (start_server_system, setup_command_log, setup_event_log).chain(),
+        )
         .add_systems(
             Update,
             process_print_active_connections.run_if(on_timer(Duration::from_secs_f32(1.0))),
@@ -65,19 +112,15 @@ fn main() -> anyhow::Result<()> {
             FixedUpdate,
             (
                 // Process Commands
-                process_fan_out_commands,
+                process_commands,
                 process_internal_commands,
-                process_command_log,
                 // Core gameplay loop
-                process_client_commands,
                 process_organization_updates,
                 process_company_updates,
                 // clear any state update flags
                 process_clear_needs_state_update,
                 // Fan out just prior to broadcasting, so we have the opportunity to save.
-                process_fan_out_events,
-                process_internal_events,
-                process_event_log,
+                process_events,
                 // Broadcast the new state now that everything is done.
                 process_broadcast_world_state,
             )
@@ -86,30 +129,6 @@ fn main() -> anyhow::Result<()> {
         .run();
 
     Ok(())
-}
-
-fn build_setup_chain(cli: &Cli) -> SystemConfigs {
-    let base = (
-        setup_connection_resources,
-        setup_world_state,
-        setup_fan_out_commands,
-        setup_fan_out_events,
-    )
-        .chain();
-
-    let with_redrive_cmds = if cli.redrive_command_log {
-        (base, setup_redrive_command_log).chain()
-    } else {
-        base
-    };
-
-    let with_redrive_events = if cli.redrive_event_log {
-        (with_redrive_cmds, setup_redrive_event_log).chain()
-    } else {
-        with_redrive_cmds
-    };
-
-    (with_redrive_events, setup_command_log, setup_event_log).chain()
 }
 
 fn setup_logging() -> WorkerGuard {
@@ -134,12 +153,11 @@ use crate::systems::process_clear_needs_state_update::process_clear_needs_state_
 use crate::systems::process_company_updates::process_company_updates;
 use crate::systems::process_organization_updates::process_organization_updates;
 use async_channel::{Receiver, Sender, unbounded};
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
-use clap::Parser;
-use shared::{InternalEvent, ServerGameState, ServerHistoryState};
+use shared::{ClientActionCommand, GameInstanceData, InternalEvent, OperatorMode, ServerEvent};
 use std::fs::read_dir;
 use std::path::PathBuf;
+use uuid::Uuid;
 
 pub fn find_latest_log_file_in_folder(folder: &str) -> Option<PathBuf> {
     let dir = PathBuf::from(folder);

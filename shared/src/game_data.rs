@@ -1,9 +1,16 @@
+use crate::HistoryState;
 use bevy::prelude::Component;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Default, Clone, Debug, Serialize, Deserialize)]
+pub struct GameInstanceData {
+    pub game_state: GameState,
+    pub history_state: HistoryState,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct GameState {
     pub week: u16,
     pub players: Vec<Player>,
