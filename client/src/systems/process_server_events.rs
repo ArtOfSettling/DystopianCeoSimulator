@@ -156,7 +156,20 @@ pub fn process_server_events(
                 rx_history.organizations.keys().cloned().collect();
             history_state_snapshot.company_order = rx_history.companies.keys().cloned().collect();
         }
-        ServerEvent::GameCreated { .. } => {}
-        ServerEvent::GameCreationFailed { .. } => {}
+        ServerEvent::GameCreated { game_id, game_name } => {
+            info!("created game: {:?} with id: {:?}", game_name, game_id);
+        }
+        ServerEvent::GameCreationFailed { game_name, reason } => {
+            info!(
+                "failed to create game with name: {:?} because: {:?}",
+                game_name, reason
+            );
+        }
+        ServerEvent::ListGames { games } => {
+            info!("games: {:?}", games);
+        }
+        ServerEvent::ListGamesFailed { reason } => {
+            info!("listGamesFailed: {:?}", reason);
+        }
     }
 }

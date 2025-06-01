@@ -21,4 +21,7 @@ pub enum InternalCommand {
         client_id: Uuid,
         game_name: String,
     },
+    ListGames {
+        client_id: Uuid,
+    },
 }

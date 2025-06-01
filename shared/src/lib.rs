@@ -9,6 +9,7 @@ pub use game_data::*;
 pub use history_data::*;
 pub use resources::*;
 use serde::{Deserialize, Serialize};
+use std::time::SystemTime;
 use uuid::Uuid;
 
 #[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -28,6 +29,7 @@ pub enum ClientMessage {
     CreateGame {
         game_name: String,
     },
+    ListGames,
 
     ClientActionCommand {
         requested_game_id: Uuid,
@@ -117,6 +119,9 @@ pub enum ServerEvent {
     GameCreated { game_id: Uuid, game_name: String },
     GameCreationFailed { game_name: String, reason: String },
 
+    ListGames { games: Vec<AvailableGame> },
+    ListGamesFailed { reason: String },
+
     FullState(GameState),
     HistoryState(HistoryState),
 }
@@ -150,4 +155,18 @@ pub enum ClientActionCommand {
         organization_id: Uuid,
         organization_budget: Budget,
     },
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AvailableGame {
+    pub metadata: GameMetadata,
+    pub has_operator: bool,
+    pub active_client_count: usize,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct GameMetadata {
+    pub id: Uuid,
+    pub name: String,
+    pub created_at: SystemTime,
 }

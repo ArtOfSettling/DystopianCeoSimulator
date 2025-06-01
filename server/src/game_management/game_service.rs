@@ -1,4 +1,5 @@
-use crate::game_management::{GameManager, GameMetadata};
+use crate::game_management::GameManager;
+use shared::GameMetadata;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -18,5 +19,11 @@ impl GameService {
 
         let metadata = self.manager.create_game(game_name).await?;
         Ok(metadata)
+    }
+
+    pub async fn list_games(&self) -> anyhow::Result<Vec<GameMetadata>> {
+        let mut games = self.manager.list_games().await?;
+        games.sort_by_key(|m| std::cmp::Reverse(m.created_at));
+        Ok(games)
     }
 }

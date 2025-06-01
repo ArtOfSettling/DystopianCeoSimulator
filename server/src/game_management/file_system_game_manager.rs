@@ -1,5 +1,6 @@
-use crate::game_management::{GameManager, GameMetadata};
+use crate::game_management::GameManager;
 use async_trait::async_trait;
+use shared::GameMetadata;
 use std::fs;
 use std::path::PathBuf;
 use std::time::SystemTime;
@@ -45,5 +46,22 @@ impl GameManager for FilesystemGameManager {
         fs::write(metadata_file, json)?;
 
         Ok(metadata)
+    }
+
+    async fn list_games(&self) -> anyhow::Result<Vec<GameMetadata>> {
+        let mut games = Vec::new();
+        for entry in fs::read_dir(&self.base_path)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                let metadata_path = path.join("metadata.json");
+                if metadata_path.exists() {
+                    let contents = fs::read_to_string(metadata_path)?;
+                    let metadata: GameMetadata = serde_json::from_str(&contents)?;
+                    games.push(metadata);
+                }
+            }
+        }
+        Ok(games)
     }
 }

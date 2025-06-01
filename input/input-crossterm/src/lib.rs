@@ -71,6 +71,7 @@ fn update_input(mut pending_player_input_action: ResMut<PendingPlayerInputAction
                 KeyCode::Char('q') => Some(PlayerInputAction::Quit),
 
                 KeyCode::Char('1') => Some(PlayerInputAction::CreateNewGame),
+                KeyCode::Char('2') => Some(PlayerInputAction::ListGames),
 
                 _ => None,
             };

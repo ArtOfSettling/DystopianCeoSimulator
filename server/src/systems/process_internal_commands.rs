@@ -1,9 +1,9 @@
 use crate::internal_commands::InternalCommand;
-use crate::systems::InternalCommandReceiver;
+use crate::systems::{ClientInfo, InternalCommandReceiver};
 use crate::{GameServiceResource, Instances};
 use bevy::prelude::{Res, ResMut};
 use log::{debug, error};
-use shared::ServerEvent;
+use shared::{AvailableGame, OperatorMode, ServerEvent};
 use tracing::info;
 
 pub fn process_internal_commands(
@@ -97,6 +97,55 @@ pub fn process_internal_commands(
                                 let _ = tx
                                     .send(ServerEvent::GameCreationFailed {
                                         game_name: game_name.clone(),
+                                        reason: e.to_string(),
+                                    })
+                                    .await;
+                            }
+                        }
+                    }
+                });
+            }
+            InternalCommand::ListGames { client_id } => {
+                let game_service = game_service.game_service.clone();
+                let tx_to_clients = instances
+                    .active_connections
+                    .get(&client_id)
+                    .map(|c| c.sender.clone());
+                let cloned_connections = instances.active_connections.clone();
+                async_std::task::spawn(async move {
+                    match game_service.list_games().await {
+                        Ok(game_metadata_list) => {
+                            info!("List games successful");
+                            if let Some(tx) = tx_to_clients {
+                                // Lock the active_connections to count clients per game
+                                let games: Vec<AvailableGame> = game_metadata_list
+                                    .iter()
+                                    .map(|metadata| {
+                                        let relevant_clients: Vec<&ClientInfo> = cloned_connections
+                                            .values()
+                                            .filter(|client| client.game_id == metadata.id)
+                                            .collect();
+
+                                        let has_operator = relevant_clients.iter().any(|client| {
+                                            client.operator_mode == OperatorMode::Operator
+                                        });
+
+                                        AvailableGame {
+                                            metadata: metadata.clone(),
+                                            has_operator,
+                                            active_client_count: relevant_clients.len(),
+                                        }
+                                    })
+                                    .collect();
+
+                                let _ = tx.send(ServerEvent::ListGames { games }).await;
+                            }
+                        }
+                        Err(e) => {
+                            error!("Failed to list games: {:?}", e);
+                            if let Some(tx) = tx_to_clients {
+                                let _ = tx
+                                    .send(ServerEvent::ListGamesFailed {
                                         reason: e.to_string(),
                                     })
                                     .await;

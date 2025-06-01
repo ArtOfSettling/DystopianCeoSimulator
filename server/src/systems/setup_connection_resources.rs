@@ -193,6 +193,11 @@ async fn read_from_client_loop(
                     })
                     .await;
             }
+            Ok(ClientMessage::ListGames) => {
+                let _ = tx_internal_commands
+                    .send(InternalCommand::ListGames { client_id: uuid })
+                    .await;
+            }
             Ok(ClientMessage::ClientActionCommand {
                 requested_game_id,
                 command,

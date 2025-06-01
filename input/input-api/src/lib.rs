@@ -12,6 +12,7 @@ pub enum PlayerInputAction {
     Quit,
 
     CreateNewGame,
+    ListGames,
 
     LaunchPRCampaign,
     SelectEmployeeToFire,
