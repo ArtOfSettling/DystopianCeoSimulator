@@ -1,7 +1,7 @@
-use crate::game_management::GameManager;
 use shared::GameMetadata;
 use std::sync::Arc;
 use uuid::Uuid;
+use crate::game_management::GameManager;
 
 #[derive(Clone)]
 pub struct GameService {

@@ -4,6 +4,7 @@ members = [
     "shared",
     "client",
     "server",
+    "service/game-metadata",
     "launcher",
     "renderer/renderer-api",
     "renderer/renderer-ratatui",

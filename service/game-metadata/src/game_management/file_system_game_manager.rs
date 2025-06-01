@@ -1,16 +1,16 @@
-use crate::game_management::GameManager;
 use async_trait::async_trait;
 use shared::GameMetadata;
 use std::fs;
 use std::path::PathBuf;
 use std::time::SystemTime;
 use uuid::Uuid;
+use crate::game_management::GameManager;
 
-pub struct FilesystemGameManager {
+pub struct FileSystemGameManager {
     base_path: PathBuf,
 }
 
-impl FilesystemGameManager {
+impl FileSystemGameManager {
     pub fn new(base_path: PathBuf) -> Self {
         Self { base_path }
     }
@@ -27,7 +27,7 @@ impl FilesystemGameManager {
 }
 
 #[async_trait]
-impl GameManager for FilesystemGameManager {
+impl GameManager for FileSystemGameManager {
     async fn create_game(&self, game_name: String) -> anyhow::Result<GameMetadata> {
         let game_id = Uuid::new_v4();
         let game_dir = self.game_path(game_id);
