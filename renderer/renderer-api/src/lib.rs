@@ -1,8 +1,8 @@
 use bevy::prelude::{Res, ResMut, Resource};
 use input_api::PendingPlayerInputAction;
 use shared::{
-    Company, ConnectionStateResource, Entity, HistoryState, Organization, PendingPlayerAction,
-    Player,
+    Company, ConnectionStateResource, Entity, HistoryState, Organization, PendingClientMessage,
+    PendingPlayerAction, Player,
 };
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -50,6 +50,7 @@ pub trait Renderer {
         &mut self,
         game_state: &ClientGameState,
         history_state: &ClientHistoryState,
+        pending_client_message: ResMut<PendingClientMessage>,
         pending_player_input_action: ResMut<PendingPlayerInputAction>,
         pending_player_action: ResMut<PendingPlayerAction>,
         connection_state_resource: Res<ConnectionStateResource>,

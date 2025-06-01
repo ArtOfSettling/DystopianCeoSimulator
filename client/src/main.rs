@@ -2,7 +2,8 @@ mod systems;
 
 use crate::systems::{
     process_poll_connection_state, process_server_events, send_client_commands,
-    setup_connection_resources, setup_pending_player_action, setup_world_state,
+    setup_connection_resources, setup_pending_client_message, setup_pending_player_action,
+    setup_world_state,
 };
 use bevy::MinimalPlugins;
 use bevy::app::{App, FixedUpdate, PluginGroup, ScheduleRunnerPlugin, Startup};
@@ -32,6 +33,7 @@ fn main() -> anyhow::Result<()> {
             Startup,
             (
                 setup_pending_player_action,
+                setup_pending_client_message,
                 setup_connection_resources,
                 setup_world_state,
             )

@@ -8,10 +8,7 @@ use uuid::Uuid;
 
 // Provides fan-out capabilities. Consumes events via the receiver and fans them out
 // to all who need to listen.
-pub fn process_commands(
-    mut command_log: ResMut<CommandLog>,
-    mut instances: ResMut<Instances>,
-) {
+pub fn process_commands(mut command_log: ResMut<CommandLog>, mut instances: ResMut<Instances>) {
     for (game_id, instance) in instances.active_instances.iter_mut() {
         while let Ok(client_action_command) = instance.rx_from_client.try_recv() {
             debug!("Writing command: {:?}", client_action_command);

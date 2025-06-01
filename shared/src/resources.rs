@@ -1,4 +1,4 @@
-use crate::{ClientActionCommand, OperatorMode};
+use crate::{ClientActionCommand, ClientMessage, OperatorMode};
 use bevy::prelude::Resource;
 use uuid::Uuid;
 
@@ -32,3 +32,6 @@ pub enum PendingAction {
 
 #[derive(Resource, Default, Debug)]
 pub struct PendingPlayerAction(pub Option<ClientActionCommand>);
+
+#[derive(Resource, Default, Debug)]
+pub struct PendingClientMessage(pub Option<ClientMessage>);

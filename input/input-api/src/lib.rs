@@ -11,6 +11,8 @@ pub enum PlayerInputAction {
     DoNothing,
     Quit,
 
+    CreateNewGame,
+
     LaunchPRCampaign,
     SelectEmployeeToFire,
     SelectEmployeeToHire,

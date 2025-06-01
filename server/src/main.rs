@@ -1,13 +1,14 @@
 mod cli;
 mod deterministic_randomization;
+mod game_management;
 mod internal_commands;
 mod plugins;
 mod systems;
 
 use crate::systems::{
-    redrive_event_logs, create_empty_world_state, process_broadcast_world_state,
-    process_commands, process_events, process_internal_commands,
-    process_print_active_connections, setup_command_log, setup_event_log, start_server_system,
+    ClientInfo, create_empty_world_state, process_broadcast_world_state, process_commands,
+    process_events, process_internal_commands, process_print_active_connections,
+    redrive_event_logs, setup_command_log, setup_event_log, start_server_system,
 };
 use bevy::MinimalPlugins;
 use bevy::app::{App, FixedUpdate, PluginGroup, ScheduleRunnerPlugin, Startup};
@@ -19,9 +20,14 @@ use std::time::Duration;
 use tracing::info;
 use tracing_appender::non_blocking::WorkerGuard;
 
+#[derive(Resource)]
+pub struct GameServiceResource {
+    pub game_service: GameService,
+}
+
 #[derive(Resource, Default)]
 pub struct Instances {
-    pub active_connections: HashMap<Uuid, ActiveConnection>,
+    pub active_connections: HashMap<Uuid, ClientInfo>,
     pub active_instances: HashMap<Uuid, Instance>,
 }
 
@@ -47,13 +53,6 @@ pub struct GameClientActionCommand {
 pub struct GameClientInternalEvent {
     pub game_id: Uuid,
     pub internal_event: InternalEvent,
-}
-
-#[derive(Clone)]
-pub struct ActiveConnection {
-    pub game_id: Uuid,
-    pub operator_mode: OperatorMode,
-    pub addr: String,
 }
 
 impl Instances {
@@ -95,6 +94,11 @@ fn main() -> anyhow::Result<()> {
     App::new()
         .add_plugins(MinimalPlugins.set(ScheduleRunnerPlugin::run_loop(Duration::from_millis(10))))
         .add_plugins(AsyncStdReadySignalPlugin { port: 5555 })
+        .insert_resource(GameServiceResource {
+            game_service: GameService::new(Arc::new(FilesystemGameManager::new(
+                "./_out/games".into(),
+            ))),
+        })
         .insert_resource(Time::<Fixed>::from_hz(128.0))
         .insert_resource(Instances {
             active_connections: Default::default(),
@@ -148,15 +152,17 @@ fn setup_logging() -> WorkerGuard {
     guard
 }
 
+use crate::game_management::{FilesystemGameManager, GameService};
 use crate::plugins::AsyncStdReadySignalPlugin;
 use crate::systems::process_clear_needs_state_update::process_clear_needs_state_update;
 use crate::systems::process_company_updates::process_company_updates;
 use crate::systems::process_organization_updates::process_organization_updates;
 use async_channel::{Receiver, Sender, unbounded};
 use bevy::prelude::*;
-use shared::{ClientActionCommand, GameInstanceData, InternalEvent, OperatorMode, ServerEvent};
+use shared::{ClientActionCommand, GameInstanceData, InternalEvent, ServerEvent};
 use std::fs::read_dir;
 use std::path::PathBuf;
+use std::sync::Arc;
 use uuid::Uuid;
 
 pub fn find_latest_log_file_in_folder(folder: &str) -> Option<PathBuf> {

@@ -18,7 +18,9 @@ use uuid::Uuid;
 
 #[derive(Clone, Debug)]
 pub struct ClientInfo {
+    pub id: Uuid,
     pub game_id: Uuid,
+    pub addr: String,
     pub operator_mode: OperatorMode,
     pub sender: Sender<ServerEvent>,
 }
@@ -131,14 +133,15 @@ async fn handle_connection(
         let _ = send_bincode_message(&mut stream, &ServerEvent::Hello(HelloState::Accepted)).await;
         let (tx, rx) = unbounded();
 
-        clients.lock().await.insert(
-            client_id,
-            ClientInfo {
-                game_id: requested_game_id,
-                operator_mode: mode.clone(),
-                sender: tx.clone(),
-            },
-        );
+        let client_info = ClientInfo {
+            id: client_id,
+            game_id: requested_game_id,
+            operator_mode: mode.clone(),
+            addr: addr.to_string(),
+            sender: tx.clone(),
+        };
+
+        clients.lock().await.insert(client_id, client_info.clone());
 
         let cloned_tx_internal_commands = tx_internal_commands.clone();
         spawn(forward_to_client_loop(stream.clone(), rx));
@@ -153,9 +156,7 @@ async fn handle_connection(
 
         tx_internal_commands
             .send(InternalCommand::Connected {
-                id: client_id,
-                addr,
-                game_id: requested_game_id,
+                client_info: client_info.clone(),
                 operator_mode: mode.clone(),
                 tx_to_clients,
                 rx_from_clients,
@@ -184,6 +185,14 @@ async fn read_from_client_loop(
 ) {
     loop {
         match read_bincode_message::<ClientMessage>(&mut stream).await {
+            Ok(ClientMessage::CreateGame { game_name }) => {
+                let _ = tx_internal_commands
+                    .send(InternalCommand::CreateGame {
+                        client_id: uuid,
+                        game_name,
+                    })
+                    .await;
+            }
             Ok(ClientMessage::ClientActionCommand {
                 requested_game_id,
                 command,

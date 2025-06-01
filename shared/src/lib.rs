@@ -24,6 +24,11 @@ pub enum ClientMessage {
         requested_game_id: Uuid,
         mode: OperatorMode,
     },
+
+    CreateGame {
+        game_name: String,
+    },
+
     ClientActionCommand {
         requested_game_id: Uuid,
         command: ClientActionCommand,
@@ -108,6 +113,9 @@ pub enum ServerEvent {
     None,
 
     Hello(HelloState),
+
+    GameCreated { game_id: Uuid, game_name: String },
+    GameCreationFailed { game_name: String, reason: String },
 
     FullState(GameState),
     HistoryState(HistoryState),

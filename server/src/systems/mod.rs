@@ -1,25 +1,25 @@
-mod redrive_event_logs;
 mod create_empty_world_state;
 mod process_broadcast_world_state;
 pub(crate) mod process_clear_needs_state_update;
-pub(crate) mod process_company_updates;
 mod process_commands;
+pub(crate) mod process_company_updates;
 mod process_events;
 mod process_internal_commands;
 pub(crate) mod process_organization_updates;
 mod process_print_active_connections;
+mod redrive_event_logs;
 mod setup_command_log;
 mod setup_connection_resources;
 mod setup_event_log;
 
 use crate::{GameClientInternalEvent, Instance};
-pub use redrive_event_logs::*;
 pub use create_empty_world_state::*;
 pub use process_broadcast_world_state::*;
 pub use process_commands::*;
 pub use process_events::*;
 pub use process_internal_commands::*;
 pub use process_print_active_connections::*;
+pub use redrive_event_logs::*;
 use serde::{Deserialize, Serialize};
 pub use setup_command_log::*;
 pub use setup_connection_resources::*;

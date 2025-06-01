@@ -2,7 +2,9 @@ use crate::operator::input::handle_input;
 use crate::operator::navigation::NavigationStack;
 use crate::operator::views::render::render;
 use bevy::prelude::{Res, ResMut};
-use input_api::PendingPlayerInputAction;
+use input_api::{PendingPlayerInputAction, PlayerInputAction};
+use rand::distributions::Alphanumeric;
+use rand::{Rng, thread_rng};
 use ratatui::backend::CrosstermBackend;
 use ratatui::crossterm::execute;
 use ratatui::crossterm::terminal::{LeaveAlternateScreen, disable_raw_mode};
@@ -11,7 +13,8 @@ use ratatui::text::Line;
 use ratatui::widgets::{Block, Borders, Paragraph};
 use ratatui::{CompletedFrame, Terminal};
 use renderer_api::{ClientGameState, ClientHistoryState, Renderer};
-use shared::{ConnectionState, ConnectionStateResource, PendingPlayerAction};
+use shared::ClientMessage::CreateGame;
+use shared::{ConnectionState, ConnectionStateResource, PendingClientMessage, PendingPlayerAction};
 use std::io;
 use tracing::{debug, error};
 
@@ -104,10 +107,21 @@ impl Renderer for RatatuiOperatorRenderer {
         &mut self,
         client_game_state: &ClientGameState,
         client_history_state: &ClientHistoryState,
+        mut pending_client_message: ResMut<PendingClientMessage>,
         mut pending_player_input_action: ResMut<PendingPlayerInputAction>,
         mut pending_player_action: ResMut<PendingPlayerAction>,
         connection_state_resource: Res<ConnectionStateResource>,
     ) {
+        if let Some(PlayerInputAction::CreateNewGame) = &pending_player_input_action.0 {
+            let game_name: String = thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(8)
+                .map(char::from)
+                .collect();
+
+            pending_client_message.0 = Some(CreateGame { game_name });
+        }
+
         if let Err(e) = self.try_draw_frame(
             &connection_state_resource.connection_state,
             client_game_state,

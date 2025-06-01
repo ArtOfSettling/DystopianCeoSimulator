@@ -70,6 +70,8 @@ fn update_input(mut pending_player_input_action: ResMut<PendingPlayerInputAction
                 KeyCode::Char('r') => Some(PlayerInputAction::SelectEmployeeForRaise),
                 KeyCode::Char('q') => Some(PlayerInputAction::Quit),
 
+                KeyCode::Char('1') => Some(PlayerInputAction::CreateNewGame),
+
                 _ => None,
             };
 

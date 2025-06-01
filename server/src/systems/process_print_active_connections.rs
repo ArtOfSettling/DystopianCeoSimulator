@@ -1,4 +1,5 @@
-use crate::{ActiveConnection, Instance, Instances};
+use crate::systems::ClientInfo;
+use crate::{Instance, Instances};
 use bevy::prelude::Res;
 use std::collections::HashMap;
 use std::io;
@@ -7,7 +8,7 @@ use uuid::Uuid;
 
 fn render_debug_state(
     instances: &HashMap<Uuid, Instance>,
-    connections: &HashMap<Uuid, ActiveConnection>,
+    connections: &HashMap<Uuid, ClientInfo>,
 ) {
     // Clear screen and move cursor to top-left
     print!("\x1B[2J\x1B[1;1H");

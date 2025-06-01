@@ -156,5 +156,7 @@ pub fn process_server_events(
                 rx_history.organizations.keys().cloned().collect();
             history_state_snapshot.company_order = rx_history.companies.keys().cloned().collect();
         }
+        ServerEvent::GameCreated { .. } => {}
+        ServerEvent::GameCreationFailed { .. } => {}
     }
 }

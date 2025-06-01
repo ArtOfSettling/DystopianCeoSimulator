@@ -11,7 +11,7 @@ use ratatui::text::Line;
 use ratatui::widgets::{Block, Borders, Paragraph};
 use ratatui::{CompletedFrame, Terminal};
 use renderer_api::{ClientGameState, ClientHistoryState, Renderer};
-use shared::{ConnectionState, ConnectionStateResource, PendingPlayerAction};
+use shared::{ConnectionState, ConnectionStateResource, PendingClientMessage, PendingPlayerAction};
 use std::io;
 use tracing::{debug, error};
 
@@ -95,8 +95,9 @@ impl Renderer for RatatuiDashboardRenderer {
         &mut self,
         _client_game_state: &ClientGameState,
         client_history_state: &ClientHistoryState,
+        _pending_client_message: ResMut<PendingClientMessage>,
         mut pending_player_input_action: ResMut<PendingPlayerInputAction>,
-        mut _pending_player_action: ResMut<PendingPlayerAction>,
+        _pending_player_action: ResMut<PendingPlayerAction>,
         connection_state_resource: Res<ConnectionStateResource>,
     ) {
         if let Err(e) = self.try_draw_frame(
