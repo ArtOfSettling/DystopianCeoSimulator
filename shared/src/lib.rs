@@ -30,6 +30,9 @@ pub enum ClientMessage {
         game_name: String,
     },
     ListGames,
+    DeleteGame {
+        game_id: Uuid,
+    },
 
     ClientActionCommand {
         requested_game_id: Uuid,
@@ -121,6 +124,9 @@ pub enum ServerEvent {
 
     ListGames { games: Vec<AvailableGame> },
     ListGamesFailed { reason: String },
+
+    GameDeleted { game_id: Uuid },
+    GameDeletionFailed { game_id: Uuid, reason: String },
 
     FullState(GameState),
     HistoryState(HistoryState),

@@ -198,6 +198,32 @@ async fn read_from_client_loop(
                     .send(InternalCommand::ListGames { client_id: uuid })
                     .await;
             }
+            Ok(ClientMessage::DeleteGame { game_id }) => {
+                let clients_guard = clients.lock().await;
+
+                let is_connected = clients_guard.values().any(|c| c.game_id == game_id);
+
+                if is_connected {
+                    if let Some(requesting_client) = clients_guard.get(&uuid) {
+                        let _ = requesting_client
+                            .sender
+                            .send(ServerEvent::GameDeletionFailed {
+                                game_id,
+                                reason: "Cannot delete game while clients are connected"
+                                    .to_string(),
+                            })
+                            .await;
+                    }
+                    return;
+                }
+
+                let _ = tx_internal_commands
+                    .send(InternalCommand::DeleteGame {
+                        client_id: uuid,
+                        game_id,
+                    })
+                    .await;
+            }
             Ok(ClientMessage::ClientActionCommand {
                 requested_game_id,
                 command,

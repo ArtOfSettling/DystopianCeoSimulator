@@ -1,6 +1,7 @@
 use crate::game_management::GameManager;
 use shared::GameMetadata;
 use std::sync::Arc;
+use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct GameService {
@@ -25,5 +26,15 @@ impl GameService {
         let mut games = self.manager.list_games().await?;
         games.sort_by_key(|m| std::cmp::Reverse(m.created_at));
         Ok(games)
+    }
+
+    pub async fn delete_game(&self, game_id: Uuid) -> anyhow::Result<()> {
+        let games = self.manager.list_games().await?;
+        if !games.iter().any(|g| g.id == game_id) {
+            anyhow::bail!("Game Id not found: {}", game_id);
+        }
+
+        self.manager.delete_game(game_id).await?;
+        Ok(())
     }
 }

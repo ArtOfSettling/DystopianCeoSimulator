@@ -13,10 +13,12 @@ use ratatui::text::Line;
 use ratatui::widgets::{Block, Borders, Paragraph};
 use ratatui::{CompletedFrame, Terminal};
 use renderer_api::{ClientGameState, ClientHistoryState, Renderer};
-use shared::ClientMessage::{CreateGame, ListGames};
+use shared::ClientMessage::{CreateGame, DeleteGame, ListGames};
 use shared::{ConnectionState, ConnectionStateResource, PendingClientMessage, PendingPlayerAction};
 use std::io;
+use std::str::FromStr;
 use tracing::{debug, error};
+use uuid::Uuid;
 
 pub struct RatatuiOperatorRenderer {
     pub(crate) terminal: Terminal<CrosstermBackend<io::Stdout>>,
@@ -124,6 +126,12 @@ impl Renderer for RatatuiOperatorRenderer {
 
         if let Some(PlayerInputAction::ListGames) = &pending_player_input_action.0 {
             pending_client_message.0 = Some(ListGames);
+        }
+
+        if let Some(PlayerInputAction::DeleteGame) = &pending_player_input_action.0 {
+            pending_client_message.0 = Some(DeleteGame {
+                game_id: Uuid::from_str("8c43ee31-25dd-4a82-8fbc-707057f70d20").unwrap(),
+            });
         }
 
         if let Err(e) = self.try_draw_frame(

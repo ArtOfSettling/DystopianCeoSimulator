@@ -24,4 +24,8 @@ pub enum InternalCommand {
     ListGames {
         client_id: Uuid,
     },
+    DeleteGame {
+        client_id: Uuid,
+        game_id: Uuid,
+    },
 }

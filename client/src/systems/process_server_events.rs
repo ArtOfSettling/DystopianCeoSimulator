@@ -171,5 +171,11 @@ pub fn process_server_events(
         ServerEvent::ListGamesFailed { reason } => {
             info!("listGamesFailed: {:?}", reason);
         }
+        ServerEvent::GameDeleted { game_id } => {
+            info!("deleted game: {:?}", game_id);
+        }
+        ServerEvent::GameDeletionFailed { game_id, reason } => {
+            info!("failed to delete game: {:?} because: {:?}", game_id, reason);
+        }
     }
 }

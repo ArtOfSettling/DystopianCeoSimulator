@@ -154,6 +154,39 @@ pub fn process_internal_commands(
                     }
                 });
             }
+            InternalCommand::DeleteGame { client_id, game_id } => {
+                instances.active_instances.remove(&game_id);
+                instances
+                    .active_connections
+                    .retain(|_, conn| conn.game_id != game_id);
+
+                let sender_opt = instances
+                    .active_connections
+                    .get(&client_id)
+                    .map(|client_info| (client_info.sender.clone(), client_info.game_id));
+
+                let game_service = game_service.game_service.clone();
+                async_std::task::spawn(async move {
+                    match game_service.delete_game(game_id).await {
+                        Ok(_) => {
+                            if let Some((sender, _)) = sender_opt {
+                                let _ = sender.send(ServerEvent::GameDeleted { game_id }).await;
+                            }
+                        }
+                        Err(e) => {
+                            error!("Failed to delete game {}: {:?}", game_id, e);
+                            if let Some((sender, _)) = sender_opt {
+                                let _ = sender
+                                    .send(ServerEvent::GameDeletionFailed {
+                                        game_id,
+                                        reason: e.to_string(),
+                                    })
+                                    .await;
+                            }
+                        }
+                    }
+                });
+            }
         }
     }
 }

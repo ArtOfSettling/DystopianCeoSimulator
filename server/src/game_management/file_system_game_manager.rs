@@ -64,4 +64,12 @@ impl GameManager for FilesystemGameManager {
         }
         Ok(games)
     }
+
+    async fn delete_game(&self, game_id: Uuid) -> anyhow::Result<()> {
+        let game_dir = self.game_path(game_id);
+        if game_dir.exists() {
+            fs::remove_dir_all(game_dir)?;
+        }
+        Ok(())
+    }
 }
